@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### 2026-11-20
 
 #### Added
+- Docs: flow visuals in `docs/images/`: who does the work (README), the guide map (README and
+  guides index), and an all-in-one journey for presentations. Editable HTML source and a
+  render script are in `docs/images/source/`.
 - Portal: a "Let AI generate abstract for me" checkbox, checked by default. Unchecked, the
   person writes their own abstract (50 to 1,500 characters, with a live counter). Title and
   abstract are moderated together with the same house rule before they are saved

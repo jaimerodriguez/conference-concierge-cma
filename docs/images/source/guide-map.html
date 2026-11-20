@@ -1,0 +1,222 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css"><style>
+body{width:1800px;height:1000px;padding:36px 44px}
+h1{font-size:34px;font-weight:800;letter-spacing:-.02em} .sub{color:var(--muted);font-size:17px;margin-top:4px}
+table{border-collapse:separate;border-spacing:0;margin-top:22px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+th,td{padding:0 10px;height:39px;border-bottom:1px solid #eee8dc;font-size:14px}
+thead th{height:auto;padding:12px 6px 10px;vertical-align:bottom;border-bottom:1.5px solid var(--line);background:#fffdf9}
+.step{display:flex;flex-direction:column;align-items:center;gap:4px}
+.step b{width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:12.5px}
+.step span{font-size:14px;font-weight:750}
+.step i{font-style:normal;font-family:"JetBrains Mono",monospace;font-size:10.5px;font-weight:600;color:var(--c);text-align:center;line-height:1.25;max-width:118px}
+.c-api{--c:var(--api)}.c-fly{--c:var(--fly)}.c-sched{--c:var(--sched)}.c-coord{--c:var(--coord)}.c-sub{--c:var(--sub)}
+td.cell{text-align:center;width:118px} td.cell.alt{background:#fcfaf6}
+.core{display:inline-block;width:18px;height:18px;border-radius:50%;background:var(--ink)}
+.also{display:inline-block;width:14px;height:14px;border-radius:50%;border:2.5px solid #9c9584}
+.gname{font-weight:650;white-space:nowrap} .gname small{color:var(--muted);font-weight:450;margin-left:6px;font-size:13px}
+.file{white-space:nowrap;font-family:"JetBrains Mono",monospace;font-size:11.5px;color:#3b4150}
+tr.sep td{height:30px;background:#f6f1e8;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+tbody tr:last-child td{border-bottom:none}
+.key{display:flex;gap:22px;align-items:center;margin-top:14px;font-size:13.5px;color:var(--muted)}
+.key span{display:flex;align-items:center;gap:7px}
+th.left{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+</style></head><body>
+<h1>Which guide explains which step</h1>
+<div class="sub">Conference Concierge · companion to the flow diagram · every guide is in <span class="mono">docs/guides/</span>, and <span class="mono">Guide NN ·</span> comments mark each step in the source</div>
+<table>
+  
+<thead>
+<tr>
+  <th class="left" style="width:470px">Guide</th>
+  <th class="c-api"><div class="step"><b>1</b><span>Propose</span><i>portal</i></div></th>
+  <th class="c-api"><div class="step"><b>2</b><span>Moderate</span><i>moderator</i></div></th>
+  <th class="c-fly"><div class="step"><b>3</b><span>Abstract</span><i>abstract-writer</i></div></th>
+  <th class="c-sched"><div class="step"><b>4</b><span>Review</span><i>program-chair + cfp-reviewer</i></div></th>
+  <th class="c-coord"><div class="step"><b>5</b><span>Accept</span><i>program-chair + advisor</i></div></th>
+  <th class="c-sub"><div class="step"><b>6</b><span>Book</span><i>scheduler</i></div></th>
+  <th class="c-sub"><div class="step"><b>7</b><span>Perks</span><i>speaker-liaison</i></div></th>
+  <th class="c-api"><div class="step"><b>+</b><span>Setup & side</span><i>attendee-helper, bio</i></div></th>
+  <th class="left">Open first</th></tr></thead><tbody>
+<tr class="sep">
+  <td colspan="10">Phase 1 · hosted, demoed live</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">00</span> Setting up the project<small>uv, venv, Ruff, the tunnel</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="core"></span></td>
+  <td class="file">.env.example, pyproject.toml</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">01</span> Declaring an agent with the CLI<small>ant apply, lock file</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"><span class="also"></span></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="cell"><span class="also"></span></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="cell"><span class="also"></span></td>
+  <td class="cell alt"><span class="core"></span></td>
+  <td class="file">managed/agents/program-chair/agent.md</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">02</span> Versioning and pinning<small>new version, same agent ID</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="core"></span></td>
+  <td class="file">managed/agents/attendee-helper/agent.md</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">03</span> Creating an agent on the fly<small>session overrides, runtime create</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"><span class="core"></span></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="file">src/concierge/abstracts.py</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">04</span> System-level memory<small>rubrics, venues, ops-notes</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="core"></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="file">src/concierge/memory.py</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">05</span> Wiring up OpenTelemetry<small>one trace per proposal</small></span></td>
+  <td class="cell"><span class="core"></span></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="cell"><span class="also"></span></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="file">src/concierge/telemetry.py</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">06</span> Storing secrets in a vault<small>sponsor key, placeholder only</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"><span class="core"></span></td>
+  <td class="cell alt"></td>
+  <td class="file">managed/vaults/concierge.yaml</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">07</span> OAuth credentials for MCP<small>organizer's calendar tokens</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="core"></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="file">src/concierge/oauth_client.py</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">08</span> Multi-agent orchestrator<small>roster and workflow runs</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="core"></span></td>
+  <td class="cell"><span class="core"></span></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="cell"><span class="also"></span></td>
+  <td class="cell alt"></td>
+  <td class="file">managed/agents/program-chair/agent.md</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">09</span> Adding an advisor<small>Opus 5.5 on call</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"><span class="core"></span></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="file">managed/agents/program-chair/agent.md</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">10</span> Scheduling an agent<small>daily 08:00 deployment</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="core"></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="file">managed/deployments/daily-review.yaml</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">11</span> Grading with outcomes<small>abstract and digest rubrics</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"><span class="core"></span></td>
+  <td class="cell alt"><span class="core"></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="file">src/concierge/abstracts.py</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">12</span> Approvals and budgets<small>always_ask, spend caps</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"><span class="also"></span></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="core"></span></td>
+  <td class="cell"><span class="core"></span></td>
+  <td class="cell alt"></td>
+  <td class="file">src/concierge/sessions.py</td></tr>
+<tr>
+  <td><span class="gname"><span class="g">13</span> Moderating user input<small>structured output</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="core"></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="file">src/concierge/moderation.py</td></tr>
+<tr class="sep">
+  <td colspan="10">Phase 2 · self-hosted, source and instructions only</td></tr>
+<tr>
+  <td><span class="gname"><span class="g p2">20</span> Moving tools into your own sandbox<small>host-side perk tool</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"><span class="also"></span></td>
+  <td class="cell alt"></td>
+  <td class="file">phase2/a-self-hosted-sandbox/</td></tr>
+<tr>
+  <td><span class="gname"><span class="g p2">21</span> Migrating to self-hosted Managed Agents<small>keep vs lose</small></span></td>
+  <td class="cell"></td>
+  <td class="cell alt"></td>
+  <td class="cell"></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="cell"><span class="also"></span></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="cell"><span class="also"></span></td>
+  <td class="cell alt"><span class="also"></span></td>
+  <td class="file">phase2/b-self-hosted-service/</td></tr>
+</tbody></table>
+<div class="key"><span><i class="core"></i> Where the guide's feature does its main work</span><span><i class="also"></i> Also used here</span>
+<span style="margin-left:auto">Step columns match the flow diagram: 1 to 3 live in the portal, 4 every morning, 5 to 7 in one agenda session</span></div>
+</body></html>

@@ -14,6 +14,14 @@ points to the exact lines that implement it, and the source carries matching mar
 
 Search the repo for `Guide 05 ·` to see every step of a guide in place.
 
+## How a talk moves through it
+
+![Who does the work, from proposal to agenda](docs/images/flow-who-does-the-work.png)
+
+Each step's agent, its type, and the guide that explains it are mapped in
+[the guide map](docs/images/guide-map.png). The images are rendered from HTML in
+[docs/images/source](docs/images/source/README.md).
+
 ## What it shows
 
 | Feature | Where it appears in the story | Guide |

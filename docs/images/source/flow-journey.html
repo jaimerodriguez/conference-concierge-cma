@@ -1,0 +1,165 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+body { width: 1800px; height: 1000px; padding: 40px 44px; position: relative; }
+header h1 { font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
+header p { color: var(--muted); font-size: 17px; margin-top: 4px; }
+.phases { display: grid; grid-template-columns: 3fr 1.25fr 3fr 0.9fr; gap: 18px; margin-top: 30px; }
+.phase { border-top: 3px solid var(--c); padding-top: 7px; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--c); }
+.phase span { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; margin-left: 6px; }
+.row { display: grid; grid-template-columns: repeat(3, 1fr) 1.25fr repeat(3, 1fr) 0.9fr; gap: 18px; margin-top: 12px; position: relative; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 9px; position: relative; box-shadow: 0 2px 0 rgba(29,34,48,.04); min-height: 610px; }
+.card:not(:last-child)::after { content: "→"; position: absolute; right: -17px; top: 34px; font-size: 18px; color: #9a9384; font-weight: 700; }
+.num { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.num b { width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 13px; }
+.card h2 { font-size: 19px; font-weight: 750; letter-spacing: -.01em; line-height: 1.2; }
+.what { font-size: 13.5px; color: var(--muted); line-height: 1.4; }
+.agent { border-radius: 10px; padding: 9px 10px; background: var(--s); border-left: 4px solid var(--c); display: flex; flex-direction: column; gap: 4px; }
+.agent .name { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 14px; color: var(--ink); }
+.agent .type { font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--c); }
+.agent .det { font-size: 12.5px; line-height: 1.38; color: #3b4150; }
+.a-fly { --c: var(--fly); --s: var(--fly-s); } .a-sched { --c: var(--sched); --s: var(--sched-s); }
+.a-coord { --c: var(--coord); --s: var(--coord-s); } .a-sub { --c: var(--sub); --s: var(--sub-s); }
+.a-adv { --c: var(--adv); --s: var(--adv-s); } .a-api { --c: var(--api); --s: var(--api-s); }
+.none { font-size: 12.5px; color: var(--muted); font-style: italic; border: 1.5px dashed var(--line); border-radius: 10px; padding: 9px 10px; }
+.down { text-align: center; color: #9a9384; font-size: 14px; line-height: 1; margin: -3px 0; }
+.ask { font-size: 12px; font-weight: 700; color: var(--adv); }
+.spacer { flex: 1; }
+.board { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.pill { font-size: 11.5px; font-weight: 700; border-radius: 99px; padding: 2px 8px; }
+.p-await { background: var(--amber-s); color: var(--amber); } .p-rev { background: var(--sub-s); color: var(--blue); }
+.p-no { background: var(--rose-s); color: var(--rose); } .p-acc { background: var(--green-s); color: var(--green); }
+.guides { border-top: 1px dashed var(--line); padding-top: 8px; font-size: 11px; color: var(--muted); }
+.guides .lbl { display: block; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; font-size: 10px; margin-bottom: 4px; }
+.end { background: linear-gradient(180deg, #e9f6ec, #fff); border-color: #bfe3c9; text-align: center; align-items: center; justify-content: center; }
+.end .big { font-size: 46px; }
+.end h2 { color: var(--green); }
+footer { position: absolute; left: 44px; right: 44px; bottom: 34px; display: grid; grid-template-columns: 1.55fr 1fr; gap: 22px; }
+.box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; font-size: 13px; line-height: 1.5; color: #3b4150; }
+.box h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
+.found { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 18px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+</style></head><body>
+<header>
+  <h1>A talk's journey, from a phone to the agenda</h1>
+  <p>Conference Concierge · the AI Meetup demo of Claude Managed Agents · <span class="g" style="margin:0">03</span> badges point to the task guide in <span class="mono">docs/guides/</span></p>
+</header>
+
+<div class="phases">
+  <div class="phase" style="--c:var(--fly)">Submit<span>live, while the speaker waits</span></div>
+  <div class="phase" style="--c:var(--sched)">Review<span>unattended, every morning</span></div>
+  <div class="phase" style="--c:var(--coord)">Decide &amp; book<span>one agenda session, organizer approves</span></div>
+  <div class="phase" style="--c:var(--green)">Publish</div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <div class="num"><b>1</b>📱 Speaker's phone</div>
+    <h2>Propose a talk</h2>
+    <div class="what">Contact email, title, track. Tick “Let AI generate abstract for me” or write your own.</div>
+    <div class="none">No agent here. The portal opens one trace that follows the proposal through every step.</div>
+    <div class="spacer"></div>
+    <div class="guides"><span class="lbl">Guides</span><span class="g">05</span></div>
+  </div>
+
+  <div class="card">
+    <div class="num"><b>2</b>🛡️ Every typed title</div>
+    <h2>Keep it respectful</h2>
+    <div class="what">Rejects anything sexual, violent or hateful, with a friendly suggestion.</div>
+    <div class="agent a-api"><span class="name">moderator</span><span class="type">Not an agent</span>
+      <span class="det">One Messages API call with structured output · Haiku 5.5</span></div>
+    <div class="spacer"></div>
+    <div class="guides"><span class="lbl">Guides</span><span class="g">13</span></div>
+  </div>
+
+  <div class="card">
+    <div class="num"><b>3</b>✍️ Only if AI writes it</div>
+    <h2>Write the abstract</h2>
+    <div class="what">In the voice of the persona the speaker picked.</div>
+    <div class="agent a-fly"><span class="name">abstract-writer</span><span class="type">On the fly</span>
+      <span class="det">Stored base, prompt overridden per session · Haiku 5.5 · graded by an outcome · $0.50 cap</span></div>
+    <div class="spacer"></div>
+    <div class="board">Board → <span class="pill p-await">Awaiting review</span></div>
+    <div class="guides"><span class="lbl">Guides</span><span class="g">03</span><span class="g">11</span><span class="g">12</span></div>
+  </div>
+
+  <div class="card">
+    <div class="num"><b>4</b>⏰ 08:00 daily</div>
+    <h2>Review new proposals</h2>
+    <div class="agent a-sched"><span class="name">daily-proposal-review</span><span class="type">Scheduled deployment</span>
+      <span class="det">Cron, $5 cap per run</span></div>
+    <div class="down">↓ fires</div>
+    <div class="agent a-coord"><span class="name">program-chair</span><span class="type">Coordinator</span>
+      <span class="det">Sonnet 5.5 · digest graded by an outcome</span></div>
+    <div class="down">↓ workflow fans out</div>
+    <div class="agent a-sub"><span class="name">cfp-reviewer × N</span><span class="type">Subagents in parallel</span>
+      <span class="det">Sonnet 5.5 · base + track rubric from memory</span></div>
+    <div class="spacer"></div>
+    <div class="board">Board → <span class="pill p-rev">Reviewed</span><span class="pill p-no">Not this time</span></div>
+    <div class="guides"><span class="lbl">Guides</span><span class="g">10</span><span class="g">08</span><span class="g">11</span><span class="g">04</span><span class="g">12</span></div>
+  </div>
+
+  <div class="card">
+    <div class="num"><b>5</b>🧑‍💼 Organizer asks</div>
+    <h2>Accept the best</h2>
+    <div class="agent a-coord"><span class="name">program-chair</span><span class="type">Coordinator</span>
+      <span class="det">Accepts the top four, ties go to variety</span></div>
+    <div class="down">↔ consults</div>
+    <div class="agent a-adv"><span class="name">advisor</span><span class="type">Advisor</span>
+      <span class="det">Opus 5.5 · checks topic and speaker balance</span></div>
+    <div class="spacer"></div>
+    <div class="board">Board → <span class="pill p-acc">Accepted</span></div>
+    <div class="guides"><span class="lbl">Guides</span><span class="g">08</span><span class="g">09</span></div>
+  </div>
+
+  <div class="card">
+    <div class="num"><b>6</b>📅 Calendar</div>
+    <h2>Book the slots</h2>
+    <div class="agent a-sub"><span class="name">scheduler</span><span class="type">Subagent</span>
+      <span class="det">Sonnet 5.5 · Calendar MCP with the organizer's OAuth tokens from the vault</span></div>
+    <div class="ask">✋ Each booking waits for a yes</div>
+    <div class="spacer"></div>
+    <div class="guides"><span class="lbl">Guides</span><span class="g">07</span><span class="g">12</span></div>
+  </div>
+
+  <div class="card">
+    <div class="num"><b>7</b>🎁 Sponsor thank-you</div>
+    <h2>Send perk codes</h2>
+    <div class="agent a-sub"><span class="name">speaker-liaison</span><span class="type">Subagent</span>
+      <span class="det">Haiku 5.5 · sponsor API key lives in the vault, the sandbox only sees a placeholder</span></div>
+    <div class="ask">✋ Each code waits for a yes</div>
+    <div class="spacer"></div>
+    <div class="guides"><span class="lbl">Guides</span><span class="g">06</span><span class="g">12</span></div>
+  </div>
+
+  <div class="card end">
+    <div class="big">🎉</div>
+    <h2>On the agenda</h2>
+    <div class="what">Slots booked on the calendar. The board says “On the agenda”, with a perk code on the way.</div>
+  </div>
+</div>
+
+<footer>
+  <div class="box"><h3>Under every step</h3>
+    <div class="found">
+      <div><span class="g">00</span>Setup and the tunnel</div>
+      <div><span class="g">01</span>Agents declared, <span class="mono">ant apply</span></div>
+      <div><span class="g">02</span>Versions and pinning</div>
+      <div><span class="g">04</span>Shared memory stores</div>
+      <div><span class="g">05</span>One trace end to end</div>
+      <div><span class="g">06</span><span class="g">07</span>Secrets in a vault</div>
+    </div>
+    <div style="margin-top:6px">Off the main path: <b class="mono">attendee-helper</b> answers “Where do I park?” from memory <span class="g">04</span> · <b class="mono">speaker-bio-writer</b> is created at runtime <span class="g">03</span> · Self-hosting <span class="g p2">20</span><span class="g p2">21</span></div>
+  </div>
+  <div class="box"><h3>Agent types</h3>
+    <div class="legend">
+      <span class="chip t-fly"><i class="dot"></i>On the fly</span>
+      <span class="chip t-sched"><i class="dot"></i>Scheduled deployment</span>
+      <span class="chip t-coord"><i class="dot"></i>Coordinator</span>
+      <span class="chip t-sub"><i class="dot"></i>Subagent</span>
+      <span class="chip t-adv"><i class="dot"></i>Advisor</span>
+      <span class="chip t-api"><i class="dot"></i>Not an agent</span>
+    </div>
+    <div style="margin-top:8px">Every agent is a file in <span class="mono">managed/agents/</span>, synced with <span class="mono">ant apply</span>.</div>
+  </div>
+</footer>
+</body></html>
