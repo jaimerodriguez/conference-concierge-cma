@@ -2,11 +2,7 @@
 {% block title %}Your proposal{% endblock %}
 {% block head %}{% if not job.outcome and not job.error %}<meta http-equiv="refresh" content="3">{% endif %}{% endblock %}
 {% block body %}
-{% if job.error %}
-  <h1>Something went wrong</h1>
-  <p>Please try again in a moment.</p>
-  <a class="button" href="{{ url_for('index') }}">Back to the form</a>
-{% elif not job.outcome %}
+{% if not job.outcome %}
   {% if job.writes_abstract %}
   <h1>Writing your abstract...</h1>
   <p>An agent is drafting the abstract for <b>{{ job.title }}</b>, and a grader is checking it
@@ -16,17 +12,12 @@
   <p>We're giving <b>{{ job.title }}</b> a quick friendliness check. This page refreshes by itself.</p>
   {% endif %}
   <p class="muted">Elapsed: {{ ((now - job.started_at) | int) }}s</p>
-{% elif job.outcome.accepted_for_review %}
+{% else %}
   <h1>{{ job.outcome.proposal.title }}</h1>
   <p><span class="pill">{{ job.outcome.proposal.track }}</span> <span class="pill">{{ job.outcome.proposal.format }}</span></p>
   <div class="panel">{{ job.outcome.proposal.abstract }}</div>
   <p>{{ job.outcome.message }}</p>
   <a class="button" href="{{ url_for('board') }}#{{ job.outcome.proposal.id }}">See it on the board</a>
   <a class="button secondary" href="{{ url_for('index') }}">Propose another talk</a>
-{% else %}
-  <h1>Let's try again</h1>
-  <p>{{ job.outcome.message }}</p>
-  {% if job.outcome.suggestion %}<p>How about: <b>{{ job.outcome.suggestion }}</b>?</p>{% endif %}
-  <a class="button" href="{{ url_for('index') }}">Back to the form</a>
 {% endif %}
 {% endblock %}

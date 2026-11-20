@@ -367,3 +367,46 @@ def test_mcp_failures_are_logged_without_the_token(
         )
     assert "MCP eventdb: POST -> 401 rpc=tools/list" in caplog.text
     assert "secret-value" not in caplog.text
+
+
+def test_a_rejected_proposal_returns_to_a_filled_in_form(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+
+    from concierge.catalog import load_catalog
+    from concierge.config import REPO_ROOT
+    from concierge.portal import app as portal_app
+    from concierge.proposals import ProposalOutcome
+    from concierge.services.app import build_app
+    from concierge.services.store import Store
+
+    def reject(*args: object, **kwargs: object) -> ProposalOutcome:
+        return ProposalOutcome(
+            accepted_for_review=False, message="Please keep it friendly.", suggestion="Houseplants"
+        )
+
+    monkeypatch.setattr(portal_app, "submit_proposal", reject)
+    monkeypatch.setattr(portal_app, "get_client", lambda: None)
+    catalog = load_catalog(REPO_ROOT / "content")
+    routes = portal_app.build_routes(settings, Store(settings.db_path), catalog)
+    typed = {
+        "contact_email": "sam@example.com",
+        "title": "My Talk Title",
+        "abstract": "A hand-written abstract that is long enough to pass the length check.",
+        "track": "community",
+        "persona": "data-engineer",
+    }
+    with TestClient(build_app(settings, catalog=catalog, extra_routes=routes)) as portal:
+        submitted = portal.post("/propose", data=typed, follow_redirects=False)
+        assert submitted.status_code == 303
+        for _ in range(50):  # the job runs in the background
+            page = portal.get(submitted.headers["location"]).text
+            if "Please keep it friendly." in page:
+                break
+            time.sleep(0.05)
+    assert "Please keep it friendly. How about: Houseplants?" in page
+    assert 'value="My Talk Title"' in page and 'value="sam@example.com"' in page
+    assert typed["abstract"] in page
+    assert 'value="community" selected' in page and 'value="data-engineer" selected' in page
+    assert 'name="ai_abstract" id="ai_abstract" value="on">' in page  # still unchecked

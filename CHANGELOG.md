@@ -16,6 +16,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Portal: email format checks in the browser and on the server (`normalize_email`).
 - Portal: after an error the form keeps what was typed; the submit button disables itself
   while a proposal is sent; the status page links to the new proposal on the board.
+- Portal: a submission that moderation rejects (or that fails) returns to the form with
+  everything still filled in (email, title, abstract, checkbox, track, persona), the reason
+  and any suggested alternative shown on top.
 - Proposal board: groups "Accepted", "Reviewed" (reviewed and waitlisted), "Not this time"
   (declined), and "Awaiting review" (submitted, not reviewed yet). Each card shows title,
   an expandable abstract, the score out of 5 as a bar, the reviewer's feedback, a next step

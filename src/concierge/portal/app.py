@@ -106,6 +106,8 @@ class Job:
     outcome: ProposalOutcome | None = None
     error: str | None = None
     started_at: float = field(default_factory=time.time)
+    # What the person typed, so a rejected submission goes back to a filled-in form.
+    form: dict[str, Any] = field(default_factory=dict)
 
 
 def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[BaseRoute]:
@@ -207,7 +209,7 @@ def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[Bas
             )
 
         job_id = secrets.token_urlsafe(8)
-        jobs[job_id] = Job(title=form["title"], writes_abstract=form["ai_abstract"])
+        jobs[job_id] = Job(title=form["title"], writes_abstract=form["ai_abstract"], form=form)
         task = asyncio.create_task(run_job(jobs[job_id], form))
         tasks.add(task)
         task.add_done_callback(tasks.discard)
@@ -217,6 +219,16 @@ def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[Bas
         job = jobs.get(request.path_params["job_id"])
         if job is None:
             return RedirectResponse(request.url_for("index"), status_code=303)
+        rejected = job.outcome is not None and not job.outcome.accepted_for_review
+        if job.error or rejected:
+            # Back to the form with everything still filled in, and the reason on top.
+            if job.outcome is not None:
+                message = job.outcome.message
+                if job.outcome.suggestion:
+                    message += f" How about: {job.outcome.suggestion}?"
+            else:
+                message = "Something went wrong. Please try again in a moment."
+            return TEMPLATES.TemplateResponse(request, "form.html", form_context(message, job.form))
         return TEMPLATES.TemplateResponse(
             request, "status.html", {"job": job, "catalog": catalog, "now": time.time()}
         )
