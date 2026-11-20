@@ -1,17 +1,120 @@
 {% extends "base.html" %}
 {% block title %}Proposal board{% endblock %}
+{% block styles %}
+<style>
+  :root { --page: 60rem; }
+  .summary { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0 .25rem; }
+  .stat { flex: 1 1 8rem; background: var(--surface); border: 1px solid var(--border); border-radius: .6rem; padding: .55rem .8rem; text-decoration: none; color: inherit; border-top: 4px solid var(--tone); }
+  .stat b { display: block; font-size: 1.4rem; line-height: 1.2; color: var(--tone); }
+  .stat span { font-size: .85rem; color: var(--muted); }
+  .filters { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1rem 0; }
+  .filters a { text-decoration: none; color: inherit; padding: .25rem .75rem; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); font-size: .9rem; }
+  .filters a[aria-current="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .group { margin-top: 2rem; }
+  .group h2 { display: flex; align-items: baseline; gap: .5rem; font-size: 1.2rem; margin: 0; color: var(--tone); }
+  .group h2 .count { font-size: .85rem; font-weight: 600; background: var(--tone-soft); color: var(--tone); border-radius: 99px; padding: 0 .55rem; }
+  .group > p { margin: .15rem 0 0; }
+  .tone-accepted { --tone: var(--green); --tone-soft: var(--green-soft); }
+  .tone-reviewed { --tone: var(--blue); --tone-soft: var(--blue-soft); }
+  .tone-declined { --tone: var(--rose); --tone-soft: var(--rose-soft); }
+  .tone-submitted { --tone: var(--amber); --tone-soft: var(--amber-soft); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: .8rem; margin-top: .8rem; }
+  .talk { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--tone); border-radius: .6rem; padding: .8rem 1rem; display: flex; flex-direction: column; gap: .45rem; box-shadow: var(--shadow); scroll-margin-top: 1rem; }
+  .talk:target { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .talk h3 { font-size: 1.02rem; margin: 0; line-height: 1.3; }
+  .meta { display: flex; flex-wrap: wrap; gap: .3rem; }
+  .pill.status { background: var(--tone-soft); color: var(--tone); border-color: transparent; font-weight: 600; }
+  .score { display: flex; align-items: center; gap: .5rem; font-size: .85rem; }
+  .score .bar { flex: 1; height: .4rem; background: var(--border); border-radius: 99px; overflow: hidden; }
+  .score .bar i { display: block; height: 100%; background: var(--tone); border-radius: 99px; }
+  details summary { cursor: pointer; color: var(--accent-text); font-size: .9rem; font-weight: 600; }
+  details p { margin: .4rem 0 0; white-space: pre-line; }
+  .feedback { font-size: .9rem; background: var(--tone-soft); border-radius: .45rem; padding: .45rem .6rem; }
+  .feedback b { display: block; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--tone); }
+  .contact { margin-top: auto; padding-top: .45rem; border-top: 1px dashed var(--border); font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; }
+  .empty { color: var(--muted); font-style: italic; margin-top: .6rem; }
+  .toolbar { display: flex; justify-content: flex-end; gap: .5rem; }
+  .toolbar button { margin: 0; padding: .3rem .7rem; font-size: .85rem; background: transparent; color: var(--accent-text); border: 1px solid var(--border); }
+</style>
+{% endblock %}
 {% block body %}
 <h1>Proposal board</h1>
-<p class="muted">{{ proposals|length }} proposals for {{ catalog.event.name }}.</p>
-{% for proposal in proposals %}
-<div class="card">
-  <b>{{ proposal.title }}</b><br>
-  <span class="muted">{{ proposal.speaker_name }}</span>
-  <span class="pill">{{ proposal.track }}</span>
-  <span class="pill">{{ proposal.status }}</span>
-  {% if proposal.overall %}<span class="pill">score {{ proposal.overall }}</span>{% endif %}
+<p class="lede">{{ all_count }} proposal{{ "" if all_count == 1 else "s" }} for {{ catalog.event.name }}. Scores are out of 5.</p>
+
+<div class="summary">
+  {% for group, items in groups %}
+  <a class="stat tone-{{ group.key }}" href="#group-{{ group.key }}"><b>{{ items|length }}</b><span>{{ group.label }}</span></a>
+  {% endfor %}
 </div>
-{% else %}
-<p>No proposals yet. Be the first!</p>
+
+<nav class="filters" aria-label="Filter by track">
+  <a href="{{ url_for('board') }}"{% if not selected_track %} aria-current="true"{% endif %}>All tracks ({{ all_count }})</a>
+  {% for track_id, track_name in track_names.items() %}
+  <a href="{{ url_for('board') }}?track={{ track_id }}"{% if selected_track == track_id %} aria-current="true"{% endif %}>{{ track_name }} ({{ track_counts[track_id] }})</a>
+  {% endfor %}
+</nav>
+
+{% if total %}
+<div class="toolbar">
+  <button type="button" data-open="true">Expand all</button>
+  <button type="button" data-open="false">Collapse all</button>
+</div>
+{% endif %}
+
+{% for group, items in groups %}
+<section class="group tone-{{ group.key }}" id="group-{{ group.key }}">
+  <h2>{{ group.label }} <span class="count">{{ items|length }}</span></h2>
+  <p class="muted">{{ group.blurb }}</p>
+  {% if items %}
+  <div class="cards">
+    {% for proposal in items %}
+    <article class="talk" id="{{ proposal.id }}">
+      <h3>{{ proposal.title }}</h3>
+      <div class="meta">
+        <span class="pill">{{ track_names.get(proposal.track, proposal.track) }}</span>
+        <span class="pill">{{ proposal.format }}</span>
+        {% if proposal.status != group.key %}<span class="pill status">{{ proposal.status }}</span>{% endif %}
+        {% if proposal.source == "manual_abstract" %}<span class="pill" title="Written by the speaker">own abstract</span>{% endif %}
+      </div>
+      <details>
+        <summary>Abstract</summary>
+        <p>{{ proposal.abstract }}</p>
+      </details>
+      {% if proposal.overall is not none %}
+      <div class="score" title="Overall score {{ proposal.overall }} out of 5">
+        <b>{{ "%.1f"|format(proposal.overall) }}</b>
+        <span class="bar"><i style="width: {{ [[proposal.overall / 5 * 100, 0]|max, 100]|min }}%"></i></span>
+        <span class="muted">/ 5</span>
+      </div>
+      {% endif %}
+      <div class="feedback">
+        <b>{% if proposal.summary %}Feedback{% else %}Next steps{% endif %}</b>
+        {% if proposal.summary %}{{ proposal.summary }}<br>{% endif %}
+        <span class="muted">{{ next_steps.get(proposal.status, "") }}</span>
+      </div>
+      <div class="contact" title="Masked to protect the speaker's privacy">Contact: {{ proposal.contact_email | mask_email }}</div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">Nothing here yet.</p>
+  {% endif %}
+</section>
 {% endfor %}
+
+{% if not all_count %}
+<p class="panel">No proposals yet. <a href="{{ url_for('index') }}">Be the first!</a></p>
+{% endif %}
+
+<script>
+  document.querySelectorAll(".toolbar button").forEach((button) => {
+    button.addEventListener("click", () => {
+      const open = button.dataset.open === "true";
+      document.querySelectorAll(".talk details").forEach((d) => { d.open = open; });
+    });
+  });
+  // Arriving from "See it on the board": open that talk's abstract.
+  const target = location.hash && document.getElementById(location.hash.slice(1));
+  if (target) target.querySelector("details")?.setAttribute("open", "");
+</script>
 {% endblock %}

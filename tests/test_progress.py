@@ -390,9 +390,9 @@ _PERK = (
 def test_a_perk_code_call_is_asked_in_plain_words() -> None:
     from concierge.progress import describe_approval
 
-    names = {"mem_1": "Priya"}.get
-    assert describe_approval(None, "bash", {"command": _PERK}, names) == (
-        "Issue a CloudCredits perk code ($50) for Priya (mem_1)?"
+    emails = {"mem_1": "priya@example.com"}.get
+    assert describe_approval(None, "bash", {"command": _PERK}, emails) == (
+        "Issue a CloudCredits perk code ($50) for priya@example.com (mem_1)?"
     )
     loop = (
         'for m in mem_1 mem_2; do curl "https://x/credits/api/codes"'
@@ -406,7 +406,7 @@ def test_a_covers_the_remaining_perk_codes_but_never_other_commands(
 ) -> None:
     console = Console(record=True, width=200, force_terminal=False)
     monkeypatch.setattr(cli, "console", console)
-    monkeypatch.setattr(cli, "_member_name", lambda member_id: None)
+    monkeypatch.setattr(cli, "_member_email", lambda member_id: None)
     answers = iter(["a", "n", ""])
     monkeypatch.setattr(cli.typer, "prompt", lambda text, **kw: next(answers))
     approve = cli._AskPerson()

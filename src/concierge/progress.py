@@ -155,13 +155,13 @@ def describe_approval(
     server: str | None,
     name: str,
     tool_input: dict[str, Any],
-    member_name: Callable[[str], str | None] | None = None,
+    member_contact: Callable[[str], str | None] | None = None,
 ) -> str:
     """One plain question for a call waiting on the person, e.g. a calendar booking."""
     perk = perk_call(name, tool_input) if server is None else None
     if perk is not None:
         member_id, amount = perk
-        speaker = member_name(member_id) if member_name else None
+        speaker = member_contact(member_id) if member_contact else None
         who = f"{speaker} ({member_id})" if speaker else member_id
         worth = f" (${amount})" if amount else ""
         return f"Issue a CloudCredits perk code{worth} for {who}?"

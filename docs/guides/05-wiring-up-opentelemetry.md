@@ -40,7 +40,7 @@ activity to that service, so it is a decision for the organization's admin.
 ```sh
 docker compose up -d
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-uv run concierge propose "houseplants"
+uv run concierge propose "Running models locally"
 open http://localhost:16686     # service: concierge-cli
 ```
 

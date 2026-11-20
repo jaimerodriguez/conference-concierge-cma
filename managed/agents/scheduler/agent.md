@@ -38,7 +38,7 @@ calendar.
 4. Check the calendar with `find_free_slots` before booking.
 5. Book each slot with `create_event`. Each booking pauses for the organizer's approval. If a
    booking is denied, read the reason, adjust, and do not retry the same booking unchanged.
-6. Report the final agenda as a table: time, room, title, speaker.
+6. Report the final agenda as a table: time, room, title, speaker contact email.
 
 If you learn something that future events should know (a room quirk, a timing lesson), add a
 short dated note under `/mnt/memory/ops-notes/`. Never write secrets or personal data.

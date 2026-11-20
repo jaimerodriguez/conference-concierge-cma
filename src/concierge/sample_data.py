@@ -19,20 +19,24 @@ from typing import Any
 from concierge.catalog import Catalog, Persona, Track
 from concierge.services.store import Store
 
-# Distinct first names, so every sample proposal has a recognizable speaker.
-SAMPLE_NAMES = (
-    "Ada",
-    "Bao",
-    "Carmen",
-    "Dev",
-    "Elif",
-    "Farah",
-    "Gus",
-    "Hana",
-    "Ivo",
-    "Juno",
-    "Kofi",
-    "Lena",
+# Distinct contact emails, so every sample proposal has a recognizable speaker.
+# example.com is reserved for examples: nothing is ever delivered there.
+SAMPLE_EMAILS = tuple(
+    f"{name}@example.com"
+    for name in (
+        "ada",
+        "bao",
+        "carmen",
+        "dev",
+        "elif",
+        "farah",
+        "gus",
+        "hana",
+        "ivo",
+        "juno",
+        "kofi",
+        "lena",
+    )
 )
 
 # Roughly what one generated abstract cost in earlier runs (Abstract Writer session).
@@ -40,14 +44,14 @@ GENERATE_CENTS_EACH = 1
 
 _TITLES = {
     "ai-ml": [
-        "Teaching an Agent About {Topic}",
-        "What a Language Model Gets Wrong About {Topic}",
-        "{Topic}, Classified: A Small Model on a Weekend Budget",
+        "{Topic} on a Weekend Budget",
+        "What I Got Wrong About {Topic}",
+        "{Topic}, From Notebook to Production",
     ],
     "community": [
-        "How {Topic} Built Our Neighborhood Meetup",
-        "Showing Up for {Topic}: Lessons From Five Years of Gatherings",
-        "Everyone Is Welcome at the {Topic} Table",
+        "Learning {Topic} Together: Notes From Our Study Group",
+        "{Topic} for Everyone",
+        "How Our Meetup Taught Itself {Topic}",
     ],
     "lightning": [
         "{Topic} in Five Minutes",
@@ -91,23 +95,25 @@ _BODIES = {
 class SamplePlan:
     """One proposal to create: who, in which voice, on what, in which track."""
 
-    name: str
+    contact_email: str
     persona: Persona
     topic: str
     track: Track
 
 
 def plan_samples(catalog: Catalog, count: int, seed: int | None = None) -> list[SamplePlan]:
-    """Pick ``count`` varied proposals: distinct names, mixed personas, tracks, and topics."""
+    """Pick ``count`` varied proposals: distinct emails, mixed personas, tracks, and topics."""
     rng = random.Random(seed)
-    names = rng.sample(SAMPLE_NAMES, k=min(count, len(SAMPLE_NAMES)))
-    while len(names) < count:  # more proposals than names: some speakers submit twice
-        names.append(rng.choice(SAMPLE_NAMES))
+    emails = rng.sample(SAMPLE_EMAILS, k=min(count, len(SAMPLE_EMAILS)))
+    while len(emails) < count:  # more proposals than emails: some speakers submit twice
+        emails.append(rng.choice(SAMPLE_EMAILS))
     topics = _spread(rng, catalog.topics, count)
     tracks = _spread(rng, catalog.tracks, count)
     return [
-        SamplePlan(name=name, persona=rng.choice(catalog.personas), topic=topic, track=track)
-        for name, topic, track in zip(names, topics, tracks, strict=True)
+        SamplePlan(
+            contact_email=email, persona=rng.choice(catalog.personas), topic=topic, track=track
+        )
+        for email, topic, track in zip(emails, topics, tracks, strict=True)
     ]
 
 
@@ -124,10 +130,26 @@ def _spread[T](rng: random.Random, items: list[T], count: int) -> list[T]:
 def write_offline(plan: SamplePlan, rng: random.Random) -> tuple[str, str]:
     """A title and abstract from the templates, with no model call."""
     topic = plan.topic
-    title = rng.choice(_TITLES.get(plan.track.id, _TITLES["fun"])).format(Topic=topic.title())
+    template = rng.choice(_TITLES.get(plan.track.id, _TITLES["fun"]))
+    title = template.format(Topic=_title_case(topic))
     opener = _OPENERS.get(plan.persona.id, "I have been exploring {topic} for a while.")
-    abstract = f"{opener.format(topic=topic)} {rng.choice(_BODIES[plan.track.format])}"
+    abstract = (
+        f"{opener.format(topic=_mid_sentence(topic))} {rng.choice(_BODIES[plan.track.format])}"
+    )
     return title, abstract
+
+
+def _title_case(text: str) -> str:
+    """Capitalize each word but keep acronyms: "running models locally (RAG)" -> "Running Models
+    Locally (RAG)". ``str.title`` would turn "AI" into "Ai"."""
+    return " ".join(word[:1].upper() + word[1:] for word in text.split())
+
+
+def _mid_sentence(text: str) -> str:
+    """Lowercase the first letter for use inside a sentence, unless it starts an acronym."""
+    if len(text) > 1 and text[1].isupper():
+        return text
+    return text[:1].lower() + text[1:]
 
 
 def create_offline(
@@ -138,7 +160,7 @@ def create_offline(
     created = []
     for plan in plan_samples(catalog, count, seed):
         title, abstract = write_offline(plan, rng)
-        member = store.find_or_add_member(plan.name, persona=plan.persona.id)
+        member = store.find_or_add_member(plan.contact_email, persona=plan.persona.id)
         created.append(
             store.add_proposal(
                 member_id=member["id"],

@@ -64,16 +64,27 @@ def test_sample_offline_is_free_varied_and_submitted(store: Store) -> None:
     assert "no cost" in result.output
     proposals = store.list_proposals(status="submitted")
     assert len(proposals) == 8
-    names = {store.get_member(p["member_id"])["name"] for p in proposals}  # type: ignore[index]
-    assert len(names) == 8  # one distinct speaker per proposal
+    emails = {store.get_member(p["member_id"])["contact_email"] for p in proposals}  # type: ignore[index]
+    assert len(emails) == 8  # one distinct speaker per proposal
+    assert all(email.endswith("@example.com") for email in emails)
     assert len({p["track"] for p in proposals}) == len(CATALOG.tracks)  # every track used
     full = [store.get_proposal(p["id"]) for p in proposals]
     assert all(p and p["title"] and p["abstract"] and p["source"] == "sample" for p in full)
 
 
 def test_sample_plans_repeat_with_a_seed() -> None:
-    first = [(p.name, p.topic, p.track.id) for p in plan_samples(CATALOG, 8, seed=3)]
-    assert first == [(p.name, p.topic, p.track.id) for p in plan_samples(CATALOG, 8, seed=3)]
+    first = [(p.contact_email, p.topic, p.track.id) for p in plan_samples(CATALOG, 8, seed=3)]
+    assert first == [
+        (p.contact_email, p.topic, p.track.id) for p in plan_samples(CATALOG, 8, seed=3)
+    ]
+
+
+def test_sample_titles_keep_acronyms() -> None:
+    from concierge.sample_data import _mid_sentence, _title_case
+
+    assert _title_case("running models locally (RAG)") == "Running Models Locally (RAG)"
+    assert _mid_sentence("Building AI agents") == "building AI agents"
+    assert _mid_sentence("MCP servers and tool use") == "MCP servers and tool use"
 
 
 def test_sample_generate_states_the_cost_and_asks(store: Store) -> None:
@@ -90,9 +101,9 @@ def test_sample_generate_uses_the_propose_path(
 ) -> None:
     calls: list[str] = []
 
-    def fake_submit(client, store, *, member_name, persona_id, track_id, topic):  # type: ignore[no-untyped-def]
-        calls.append(member_name)
-        member = store.find_or_add_member(member_name, persona=persona_id)
+    def fake_submit(client, store, *, contact_email, persona_id, track_id, topic):  # type: ignore[no-untyped-def]
+        calls.append(contact_email)
+        member = store.find_or_add_member(contact_email, persona=persona_id)
         proposal = store.add_proposal(
             member_id=member["id"],
             event_id="e",
@@ -111,13 +122,30 @@ def test_sample_generate_uses_the_propose_path(
     assert len(calls) == 2 and len(store.list_proposals(status="submitted")) == 2
 
 
-def test_a_second_proposal_reuses_the_member_with_that_name(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_a_second_proposal_reuses_the_member_with_that_email(tmp_path) -> None:  # type: ignore[no-untyped-def]
     store = Store(tmp_path / "db.sqlite")
-    first = store.find_or_add_member("Priya", persona="data-engineer")
-    again = store.find_or_add_member(" priya ", persona="weekend-hacker")
+    first = store.find_or_add_member("priya@example.com", persona="data-engineer")
+    again = store.find_or_add_member(" Priya@Example.com ", persona="weekend-hacker")
     assert again["id"] == first["id"]
     assert len(store.list_members()) == 1
-    assert store.find_or_add_member("Sam")["id"] != first["id"]
+    assert store.find_or_add_member("sam@example.com")["id"] != first["id"]
+
+
+def test_an_old_database_with_first_names_is_migrated(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    import sqlite3
+
+    path = tmp_path / "old.sqlite"
+    with sqlite3.connect(path) as db:
+        db.execute(
+            "CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT NOT NULL, persona TEXT,"
+            " roles TEXT NOT NULL DEFAULT '[\"attendee\"]', created_at REAL NOT NULL)"
+        )
+        db.execute("INSERT INTO members (id, name, created_at) VALUES ('mem_1', 'Ada', 0)")
+        db.execute("INSERT INTO members (id, name, created_at) VALUES ('mem_2', 'b@x.org', 0)")
+    store = Store(path)
+    assert store.get_member("mem_1")["contact_email"] == "ada@example.com"  # type: ignore[index]
+    assert store.get_member("mem_2")["contact_email"] == "b@x.org"  # type: ignore[index]
+    Store(path)  # migrating twice is a no-op
 
 
 class FakeMemories:

@@ -28,9 +28,10 @@ Non-goals: a production event platform, real email delivery, a real calendar pro
 
 The "AI Meetup" runs a monthly event. Before each event:
 
-1. **Members propose talks.** Anyone at the event can open the portal on their phone, pick a
-   persona and a topic (or type their own), pick a track, and get a generated abstract
-   submitted as a proposal.
+1. **Members propose talks.** Anyone at the event can open the portal on their phone, enter a
+   contact email, pick a track, and either let an agent write the abstract (pick a persona and
+   a topic, or type their own) or write their own title and abstract. The proposal board
+   groups every proposal as Accepted, Reviewed, Not this time, or Awaiting review.
 2. **Every morning, the Program Chair reviews new proposals.** A scheduled run fans out the
    new proposals to CFP Reviewers, who score each against the base rubric plus its track
    rubric. The chair writes a digest.
@@ -98,8 +99,8 @@ demo can show switching venues: a tech office and a public library.
 ### 3.5 Personas and topics
 
 `content/personas.yaml` and `content/topics.yaml` hold predefined entries for the portal
-("Weekend hacker", "Data engineer", "Community organizer"…; "bunnies", "sourdough",
-"retro games"…). Predefined entries skip moderation.
+("Weekend hacker", "Data engineer", "Community organizer"…; "Building AI agents",
+"Model distillation", "Writing agent skills"…). Predefined entries skip moderation.
 
 ---
 
@@ -203,6 +204,8 @@ read-only), which also blocks memory poisoning from the public.
 2. Typed topics go to the Moderator (Haiku 5.5, structured output: `allowed`, `reason`,
    `suggestion`). Rejects sexual, violent, hateful or harassing content, real private people,
    and anything not respectful. Rejection shows a friendly "try another topic" with a suggestion.
+   A title and abstract a person writes themselves go through the same check, with the same
+   house rule, before they are saved.
 3. The Abstract Writer's prompt repeats the content rules (defense in depth).
 4. Session budgets cap spend per submission; the portal rate-limits per IP.
 
@@ -212,7 +215,9 @@ read-only), which also blocks memory poisoning from the public.
 Portal → moderation (if typed) → `sessions.create` with `agent_with_overrides` (system prompt
 built from persona + track, `budget`) and `initial_events: [user.define_outcome]` whose rubric is
 base + track template → stream until idle → read `abstract.json` from the session → save the
-proposal through the services API.
+proposal through the services API. When the person writes their own abstract, the portal
+moderates the title and abstract and saves them as they are (source `manual_abstract`); no
+session runs.
 
 **Daily review (scheduled + workflow + outcome).**
 Deployment fires at 08:00 → Program Chair lists new proposals (Event DB MCP) → workflow run with
@@ -322,7 +327,7 @@ conference-concierge/
 │   ├── sessions.py           # event loop: streaming, approvals, custom tools
 │   ├── moderation.py, abstracts.py, bios.py, review.py, attendee.py
 │   ├── memory.py, vaults.py, oauth_client.py
-│   ├── portal/               # Starlette proposal form, served by `concierge serve`
+│   ├── portal/               # Starlette proposal form and board, served by `concierge serve`
 │   └── services/             # OAuth server, Calendar MCP, Event DB MCP, CloudCredits API
 ├── phase2/
 │   ├── a-self-hosted-sandbox/

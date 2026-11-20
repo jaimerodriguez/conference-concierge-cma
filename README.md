@@ -159,7 +159,7 @@ For a clean start, clear the data from earlier runs and add sample proposals fir
 [Demo data](#demo-data) below): `uv run concierge data clear`, then `uv run concierge data sample`.
 
 ```sh
-uv run concierge propose "bunnies" --name Sam     # or use the form at your tunnel address
+uv run concierge propose "Building AI agents"     # or use the form at your tunnel address
 uv run concierge review run                       # fire the daily review now
 uv run concierge agenda build                     # approve bookings and perk codes (y, n, or a for all)
 uv run concierge ask "Where do I park?"           # the Attendee Helper, from memory
@@ -218,7 +218,7 @@ src/concierge/
   proposals.py, sample_data.py      submitting proposals; `data sample`
   memory.py, vaults.py, oauth_client.py, telemetry.py
   services/         mock OAuth server, Calendar MCP, Event DB MCP, sponsor API
-  portal/           the proposal form
+  portal/           the proposal form and proposal board
 phase2/      a-self-hosted-sandbox/ and b-self-hosted-service/
 docs/        SPEC.md and the task guides
 tests/       run without an API key

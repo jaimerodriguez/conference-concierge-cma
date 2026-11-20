@@ -40,4 +40,4 @@ curl -sS -X POST "https://concierge.example.com/credits/api/codes" \
   URL, a file, or a message.
 - The API returns the same code if a member already has one, so calling it twice is safe.
 - Record each code with the eventdb `record_perk` tool.
-- Reply with a table: speaker name, talk title, code.
+- Reply with a table: speaker contact email, talk title, code.

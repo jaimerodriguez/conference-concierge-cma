@@ -144,7 +144,7 @@ class _AskPerson:
         if server is None and event.name == "bash":
             # "a" covers the rest of the perk codes, never arbitrary shell commands.
             key = "cloudcredits.issue_code" if perk_call("bash", tool_input) else None
-        question = describe_approval(server, event.name, tool_input, _member_name)
+        question = describe_approval(server, event.name, tool_input, _member_email)
         if key is not None and key in self.approve_rest:
             console.print(f"[green]Approved (you said yes to all):[/green] {question[:-1]}")
             return Decision(allow=True)
@@ -176,15 +176,15 @@ class _AskPerson:
 _ask_person = _AskPerson()
 
 
-def _member_name(member_id: str) -> str | None:
-    """A speaker's name from the local Event DB, for approval questions."""
+def _member_email(member_id: str) -> str | None:
+    """A speaker's contact email from the local Event DB, for approval questions."""
     from concierge.services.store import Store
 
     try:
         member = Store(get_settings().db_path).get_member(member_id)
     except Exception:
         return None
-    return member["name"] if member else None
+    return member["contact_email"] if member else None
 
 
 # --- services -----------------------------------------------------------------------
@@ -485,7 +485,7 @@ def auth_calendar(
 @app.command()
 def propose(
     topic: Annotated[str, typer.Argument(help="What the talk is about, in a sentence.")],
-    name: Annotated[str, typer.Option(help="Member's first name.")] = "Sam",
+    email: Annotated[str, typer.Option(help="Member's contact email.")] = "sam@example.com",
     persona: Annotated[
         str, typer.Option(help="Speaker persona id from content/personas.yaml.")
     ] = "weekend-hacker",
@@ -500,7 +500,7 @@ def propose(
         outcome = submit_proposal(
             _client(),
             Store(settings.db_path),
-            member_name=name,
+            contact_email=email,
             persona_id=persona,
             track_id=track,
             topic=topic,
@@ -646,7 +646,8 @@ def data_sample(
 
     Offline and free by default: templates filled from the personas, topics, and tracks.
 
-    Each sample speaker has a distinct name. Nothing in your Anthropic workspace is created.
+    Each sample speaker has a distinct contact email. Nothing in your Anthropic workspace is
+    created.
     """
     from concierge.catalog import get_catalog
     from concierge.sample_data import GENERATE_CENTS_EACH, create_offline, plan_samples
@@ -674,11 +675,11 @@ def data_sample(
     client = _client()
     created = []
     for number, plan in enumerate(plan_samples(catalog, count, seed), start=1):
-        with console.status(f"Writing abstract {number} of {count} ({plan.name})..."):
+        with console.status(f"Writing abstract {number} of {count} ({plan.contact_email})..."):
             outcome = submit_proposal(
                 client,
                 store,
-                member_name=plan.name,
+                contact_email=plan.contact_email,
                 persona_id=plan.persona.id,
                 track_id=plan.track.id,
                 topic=plan.topic,
@@ -686,17 +687,19 @@ def data_sample(
         if outcome.proposal:
             created.append(outcome.proposal)
         else:
-            console.print(f"[yellow]Skipped {plan.name}:[/yellow] {outcome.message}")
+            console.print(f"[yellow]Skipped {plan.contact_email}:[/yellow] {outcome.message}")
     _show_samples(created, store)
     console.print(f"Added {_plural(len(created), 'proposal')}.")
     shutdown_telemetry()
 
 
 def _show_samples(created: list[dict[str, Any]], store: Any) -> None:
-    table = Table("ID", "Title", "Track", "Speaker")
+    table = Table("ID", "Title", "Track", "Contact email")
     for proposal in created:
         member = store.get_member(proposal["member_id"]) or {}
-        table.add_row(proposal["id"], proposal["title"], proposal["track"], member.get("name", "?"))
+        table.add_row(
+            proposal["id"], proposal["title"], proposal["track"], member.get("contact_email", "?")
+        )
     console.print(table)
 
 
@@ -712,13 +715,13 @@ def proposals(
     """List proposals in the local Event DB."""
     from concierge.services.store import Store
 
-    table = Table("ID", "Title", "Track", "Speaker", "Status", "Score", "Rec.")
+    table = Table("ID", "Title", "Track", "Contact email", "Status", "Score", "Rec.")
     for row in Store(get_settings().db_path).list_proposals(status=status):
         table.add_row(
             row["id"],
             row["title"],
             row["track"],
-            row["speaker_name"],
+            row["contact_email"],
             row["status"],
             "" if row["overall"] is None else str(row["overall"]),
             row["recommendation"] or "",

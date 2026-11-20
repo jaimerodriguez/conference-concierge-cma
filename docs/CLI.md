@@ -41,7 +41,7 @@ uv run concierge propose TOPIC [OPTIONS]
 | Argument or option | Default | What it does |
 | --- | --- | --- |
 | `TOPIC` | required | What the talk is about, in a sentence. |
-| `--name` | `Sam` | Member's first name. |
+| `--email` | `sam@example.com` | Member's contact email. |
 | `--persona` | `weekend-hacker` | Speaker persona id from content/personas.yaml. |
 | `--track` | `fun` | Track id from content/tracks.yaml. |
 

@@ -14,7 +14,7 @@ from typing import Any
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS members (
     id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
+    contact_email TEXT NOT NULL,
     persona TEXT,
     roles TEXT NOT NULL DEFAULT '["attendee"]',
     created_at REAL NOT NULL
@@ -94,6 +94,7 @@ class Store:
         path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as db:
             db.executescript(SCHEMA)
+            _migrate_member_name_to_contact_email(db)
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -115,33 +116,37 @@ class Store:
 
     # --- members -------------------------------------------------------------------
 
-    def add_member(self, name: str, persona: str | None = None) -> dict[str, Any]:
+    def add_member(self, contact_email: str, persona: str | None = None) -> dict[str, Any]:
         member_id = new_id("mem")
         with self._connect() as db:
             db.execute(
-                "INSERT INTO members (id, name, persona, created_at) VALUES (?, ?, ?, ?)",
-                (member_id, name, persona, time.time()),
+                "INSERT INTO members (id, contact_email, persona, created_at) VALUES (?, ?, ?, ?)",
+                (member_id, contact_email, persona, time.time()),
             )
         return self.get_member(member_id)  # type: ignore[return-value]
 
-    def find_or_add_member(self, name: str, persona: str | None = None) -> dict[str, Any]:
-        """The member with this name (ignoring case), or a new one.
+    def find_or_add_member(self, contact_email: str, persona: str | None = None) -> dict[str, Any]:
+        """The member with this contact email (ignoring case), or a new one.
 
         One person submitting twice is one member with two proposals, not two members with
-        the same name. The first persona stays; it only shapes how an abstract is written.
+        the same email. The first persona stays; it only shapes how an abstract is written.
         """
+        contact_email = contact_email.strip()
         row = self._one(
-            "SELECT * FROM members WHERE lower(name) = lower(?) ORDER BY created_at LIMIT 1",
-            name.strip(),
+            "SELECT * FROM members WHERE lower(contact_email) = lower(?)"
+            " ORDER BY created_at LIMIT 1",
+            contact_email,
         )
-        return _decode_member(row) if row else self.add_member(name.strip(), persona=persona)
+        return _decode_member(row) if row else self.add_member(contact_email, persona=persona)
 
     def get_member(self, member_id: str) -> dict[str, Any] | None:
         row = self._one("SELECT * FROM members WHERE id = ?", member_id)
         return _decode_member(row) if row else None
 
     def list_members(self, role: str | None = None) -> list[dict[str, Any]]:
-        members = [_decode_member(row) for row in self._all("SELECT * FROM members ORDER BY name")]
+        members = [
+            _decode_member(row) for row in self._all("SELECT * FROM members ORDER BY contact_email")
+        ]
         return [m for m in members if role is None or role in m["roles"]]
 
     def add_role(self, member_id: str, role: str) -> None:
@@ -189,7 +194,7 @@ class Store:
 
     def get_proposal(self, proposal_id: str) -> dict[str, Any] | None:
         row = self._one(
-            "SELECT p.*, m.name AS speaker_name FROM proposals p"
+            "SELECT p.*, m.contact_email FROM proposals p"
             " JOIN members m ON m.id = p.member_id WHERE p.id = ?",
             proposal_id,
         )
@@ -203,7 +208,7 @@ class Store:
     ) -> list[dict[str, Any]]:
         rows = self._all(
             "SELECT p.id, p.title, p.track, p.format, p.status, p.member_id,"
-            " m.name AS speaker_name, r.overall, r.recommendation"
+            " m.contact_email, r.overall, r.recommendation"
             " FROM proposals p JOIN members m ON m.id = p.member_id"
             " LEFT JOIN reviews r ON r.proposal_id = p.id ORDER BY p.created_at"
         )
@@ -213,6 +218,19 @@ class Store:
             if (status is None or row["status"] == status)
             and (track is None or row["track"] == track)
         ]
+
+    def list_board_proposals(self) -> list[dict[str, Any]]:
+        """Every proposal with what the public board shows: abstract, score, and feedback.
+
+        Kept apart from ``list_proposals`` so the Event DB tool stays short for agents.
+        """
+        return self._all(
+            "SELECT p.id, p.title, p.abstract, p.track, p.format, p.status, p.source,"
+            " p.created_at, m.contact_email, r.overall, r.recommendation, r.summary"
+            " FROM proposals p JOIN members m ON m.id = p.member_id"
+            " LEFT JOIN reviews r ON r.proposal_id = p.id"
+            " ORDER BY r.overall IS NULL, r.overall DESC, p.created_at DESC"
+        )
 
     def set_proposal_status(self, proposal_id: str, status: str) -> dict[str, Any]:
         if status not in PROPOSAL_STATUSES:
@@ -374,6 +392,23 @@ class Store:
     def delete_oauth_token(self, token: str) -> None:
         with self._connect() as db:
             db.execute("DELETE FROM oauth_tokens WHERE token = ?", (token,))
+
+
+def _migrate_member_name_to_contact_email(db: sqlite3.Connection) -> None:
+    """Upgrade a database from before members had a contact email instead of a first name.
+
+    Old demo rows hold first names, so each becomes a placeholder ``name@example.com``
+    (example.com is reserved for examples and never delivers mail).
+    """
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(members)")}
+    if "name" not in columns or "contact_email" in columns:
+        return
+    db.execute("ALTER TABLE members RENAME COLUMN name TO contact_email")
+    db.execute(
+        "UPDATE members SET contact_email ="
+        " lower(replace(trim(contact_email), ' ', '.')) || '@example.com'"
+        " WHERE contact_email NOT LIKE '%@%'"
+    )
 
 
 def _decode_member(row: dict[str, Any]) -> dict[str, Any]:

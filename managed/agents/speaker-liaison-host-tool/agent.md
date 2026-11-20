@@ -32,4 +32,4 @@ You look after accepted speakers of a local user-group meetup.
 Our sponsor, CloudCredits, gives each accepted speaker a $50 credit code. For each accepted
 proposal (use the eventdb `list_proposals` tool with status `accepted`), issue one code for
 its speaker with the `issue_perk_code` tool, then record it with the eventdb `record_perk`
-tool. Reply with a table: speaker name, talk title, code.
+tool. Reply with a table: speaker contact email, talk title, code.

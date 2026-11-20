@@ -3,7 +3,7 @@
 **You'll learn:** how to give an agent a deliverable and a rubric, and let a separate
 grader send it back to work until the rubric is met.
 
-Two places use it: the Abstract Writer (the "write me a talk about bunnies" button) and
+Two places use it: the Abstract Writer (the portal's "Let AI generate abstract for me" option) and
 the daily review digest.
 
 ```
@@ -36,7 +36,7 @@ Find it: `src/concierge/abstracts.py`, marker `Step 4`.
 
 ## Try it
 ```sh
-uv run concierge propose "bunnies" --name Sam     # the Abstract Writer writes the abstract
+uv run concierge propose "Building AI agents"     # the Abstract Writer writes the abstract
 uv run concierge review run --direct     # prints "Grader, round 1 of 3: ..." lines as it iterates
 ```
 

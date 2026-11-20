@@ -163,7 +163,7 @@ def test_calendar_booking_with_oauth_token_and_refresh(
 
 def test_proposal_review_acceptance_and_perk(client: TestClient, settings: Settings) -> None:
     store = client.app.state.store
-    member = store.add_member("Sam", persona="weekend-hacker")
+    member = store.add_member("sam@example.com", persona="weekend-hacker")
     proposal = store.add_proposal(
         member_id=member["id"],
         event_id="event",
@@ -245,11 +245,78 @@ def test_portal_pages_render(settings: Settings) -> None:
     routes = build_routes(settings, Store(settings.db_path), catalog)
     with TestClient(build_app(settings, catalog=catalog, extra_routes=routes)) as portal:
         form = portal.get("/")
-        assert form.status_code == 200 and "bunnies" in form.text
+        assert form.status_code == 200 and catalog.topics[0] in form.text
+        assert "Submit talk proposal" in form.text and "Let AI generate abstract" in form.text
         assert portal.get("/board").status_code == 200
-        # A missing persona is rejected before any model call is made.
-        bad = portal.post("/propose", data={"name": "Sam", "persona": "nope", "track": "fun"})
+        good = {"contact_email": "sam@example.com", "persona": "weekend-hacker", "track": "fun"}
+        # Every bad submission below is rejected before any model call is made.
+        bad = portal.post("/propose", data={**good, "persona": "nope", "ai_abstract": "on"})
         assert bad.status_code == 400
+        bad_email = portal.post("/propose", data={**good, "contact_email": "sam@", "topic": "x"})
+        assert bad_email.status_code == 400 and "valid contact email" in bad_email.text
+        # Unchecking "Let AI generate abstract" makes the title and abstract required...
+        no_abstract = portal.post("/propose", data={**good, "title": "Mine", "topic": "x"})
+        assert no_abstract.status_code == 400 and "abstract of at least" in no_abstract.text
+        # ...and what was typed comes back, so nobody retypes it.
+        assert 'value="Mine"' in no_abstract.text and 'value="sam@example.com"' in no_abstract.text
+
+
+def test_board_groups_proposals_and_shows_feedback(settings: Settings) -> None:
+    from concierge.catalog import load_catalog
+    from concierge.config import REPO_ROOT
+    from concierge.portal.app import build_routes
+    from concierge.services.app import build_app
+    from concierge.services.store import Store
+
+    catalog = load_catalog(REPO_ROOT / "content")
+    store = Store(settings.db_path)
+    member = store.add_member("ada@example.com")
+    titles = {}
+    for status in ("accepted", "waitlisted", "declined", "submitted"):
+        proposal = store.add_proposal(
+            member_id=member["id"],
+            event_id="e",
+            track="ai-ml",
+            format="talk",
+            title=f"Talk {status}",
+            abstract=f"Abstract for {status}.",
+            source="sample",
+        )
+        if status != "submitted":
+            store.record_review(
+                proposal["id"],
+                scores={"Clarity": 4},
+                overall=4.0,
+                recommendation="accept",
+                summary=f"Feedback for {status}.",
+            )
+            store.set_proposal_status(proposal["id"], status)
+        titles[status] = proposal["id"]
+
+    routes = build_routes(settings, store, catalog)
+    with TestClient(build_app(settings, catalog=catalog, extra_routes=routes)) as portal:
+        page = portal.get("/board").text
+    sections = {
+        key: page.index(f'id="group-{key}"')
+        for key in ("accepted", "reviewed", "declined", "submitted")
+    }
+    position = {status: page.index(f'id="{pid}"') for status, pid in titles.items()}
+    assert sections["accepted"] < position["accepted"] < sections["reviewed"]
+    assert sections["reviewed"] < position["waitlisted"] < sections["declined"]
+    assert sections["declined"] < position["declined"] < sections["submitted"]
+    assert position["submitted"] > sections["submitted"]
+    assert "Not this time" in page and "Abstract for accepted." in page
+    assert "Feedback for declined." in page and "Contact: a***@example.com" in page
+    assert "ada@example.com" not in page  # the board never shows a full address
+
+
+def test_board_masks_contact_emails() -> None:
+    from concierge.portal.app import mask_email
+
+    assert mask_email("ada.lovelace@example.com") == "ad***e@example.com"
+    assert mask_email("juno@example.com") == "ju***o@example.com"
+    assert mask_email("ada@example.com") == "a***@example.com"
+    assert mask_email("not-an-address") == "***"
 
 
 def _initialize(protocol_version: str = "2025-06-18") -> dict[str, object]:

@@ -5,6 +5,42 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2026-11-20
+
+#### Added
+- Portal: a "Let AI generate abstract for me" checkbox, checked by default. Unchecked, the
+  person writes their own title and abstract (50 to 1,500 characters, with a live counter).
+  Both are moderated with the same house rule before they are saved (`moderate_abstract`), no
+  agent session runs, and the proposal's source is `manual_abstract`.
+- Portal: email format checks in the browser and on the server (`normalize_email`).
+- Portal: after an error the form keeps what was typed; the submit button disables itself
+  while a proposal is sent; the status page links to the new proposal on the board.
+- Proposal board: groups "Accepted", "Reviewed" (reviewed and waitlisted), "Not this time"
+  (declined), and "Awaiting review" (submitted, not reviewed yet). Each card shows title,
+  an expandable abstract, the score out of 5 as a bar, the reviewer's feedback, a next step
+  for its status, and the contact email at the bottom. Also: counts per group, a track filter
+  (`/board?track=ai-ml`), Expand all / Collapse all, highest scores first, a link anchor per
+  proposal, and a dark-mode palette.
+- Proposal board: contact emails are masked, keeping the first two letters and the last
+  letter before the @ (`ad***e@example.com`; three letters or fewer keep only the first).
+- `Store.list_board_proposals()` for the board, so the Event DB `list_proposals` tool stays
+  short for agents.
+
+#### Changed
+- Members are identified by a contact email instead of a first name: the `members.name`
+  column is now `members.contact_email`, and proposals return `contact_email` instead of
+  `speaker_name`. A database from before this change is migrated when the store opens; old
+  first names become placeholder `name@example.com` addresses.
+- `concierge propose --name` is now `--email` (default `sam@example.com`). `concierge
+  proposals` and `concierge data sample` show a "Contact email" column.
+- Sample speakers use `@example.com` contact emails; sample titles keep acronyms like "AI".
+- Predefined topics in `content/topics.yaml` are now AI-centered (agents, distillation,
+  training and fine-tuning, agent skills, RAG, evaluation, MCP, and more).
+- Speaker Liaison (both variants) and Scheduler prompts report the speaker's contact email
+  instead of a name, since members no longer have one. Phase 2b copies updated to match.
+- Portal styling: a header with navigation, panels, and status colors; the submit button
+  reads "Submit talk proposal".
+
 ### 2026-11-19
 
 #### Added
