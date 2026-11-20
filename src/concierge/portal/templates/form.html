@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block body %}
 <h1>Propose a talk</h1>
-<p class="lede">Tell us what you'd talk about at {{ catalog.event.name }}. An agent can write the abstract for you, or you can write your own.</p>
+<p class="lede">Give your talk for {{ catalog.event.name }} a title. An agent can write the abstract for you, or you can write your own.</p>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 <form method="post" action="{{ url_for('propose') }}" id="proposal-form" class="panel">
   <label>Contact email address
@@ -10,41 +10,18 @@
            autocomplete="email" inputmode="email" value="{{ values.contact_email or '' }}" required>
   </label>
 
-  <label>Track
-    <select name="track">
-      {% for track in catalog.tracks %}<option value="{{ track.id }}"{% if values.track == track.id %} selected{% endif %}>{{ track.name }} ({{ track.format }})</option>{% endfor %}
-    </select>
+  <label>Talk title
+    <input type="text" name="title" id="title" maxlength="{{ limits.title }}" placeholder="Distilling a big model into a small one"
+           value="{{ values.title or '' }}" required>
   </label>
 
   <label class="check" style="margin-top:1.25rem">
     <input type="checkbox" name="ai_abstract" id="ai_abstract" value="on"{% if values.ai_abstract %} checked{% endif %}>
     <span>Let AI generate abstract for me
-      <span class="hint">Uncheck to write your own title and abstract.</span></span>
+      <span class="hint">An agent writes the abstract for your title. Uncheck to write your own.</span></span>
   </label>
 
-  <div id="ai-fields"{% if not values.ai_abstract %} hidden{% endif %}>
-    <label>Persona
-      <span class="hint">The voice the agent writes in.</span>
-      <select name="persona">
-        {% for persona in catalog.personas %}<option value="{{ persona.id }}"{% if values.persona == persona.id %} selected{% endif %}>{{ persona.name }}</option>{% endfor %}
-      </select>
-    </label>
-    <label>Topic
-      <select name="topic">
-        {% for topic in catalog.topics %}<option{% if values.picked_topic == topic %} selected{% endif %}>{{ topic }}</option>{% endfor %}
-      </select>
-    </label>
-    <label>...or type your own topic
-      <input type="text" name="custom_topic" maxlength="{{ limits.topic }}" placeholder="Leave empty to use the list"
-             value="{{ values.custom_topic or '' }}">
-    </label>
-  </div>
-
   <div id="own-fields"{% if values.ai_abstract %} hidden{% endif %}>
-    <label>Talk title
-      <input type="text" name="title" id="title" maxlength="{{ limits.title }}" placeholder="Distilling a big model into a small one"
-             value="{{ values.title or '' }}"{% if not values.ai_abstract %} required{% endif %}>
-    </label>
     <label>Abstract
       <span class="hint">A few sentences: what you'll cover and what people will take away.</span>
       <textarea name="abstract" id="abstract" minlength="{{ limits.abstract_min }}" maxlength="{{ limits.abstract }}"
@@ -53,26 +30,40 @@
     <div class="counter" id="abstract-counter" aria-live="polite"></div>
   </div>
 
+  <label>Track
+    <select name="track">
+      {% for track in catalog.tracks %}<option value="{{ track.id }}"{% if values.track == track.id %} selected{% endif %}>{{ track.name }} ({{ track.format }})</option>{% endfor %}
+    </select>
+  </label>
+
+  <label>Persona
+    <span class="hint" id="persona-hint">The voice the agent writes your abstract in.</span>
+    <select name="persona">
+      {% for persona in catalog.personas %}<option value="{{ persona.id }}"{% if values.persona == persona.id %} selected{% endif %}>{{ persona.name }}</option>{% endfor %}
+    </select>
+  </label>
+
   <p class="muted">Anything you type is checked first. Keep it friendly: nothing sexual or violent.</p>
   <button type="submit" id="submit">Submit talk proposal</button>
 </form>
 
 <script>
-  // Without JavaScript both sections stay usable and the server checks everything.
+  // Shows the abstract field when the box is unchecked. The server checks everything again.
   (() => {
     const form = document.getElementById("proposal-form");
     const toggle = document.getElementById("ai_abstract");
-    const ai = document.getElementById("ai-fields");
+    const personaHint = document.getElementById("persona-hint");
     const own = document.getElementById("own-fields");
-    const title = document.getElementById("title");
     const abstract = document.getElementById("abstract");
     const counter = document.getElementById("abstract-counter");
     const max = Number(abstract.maxLength);
     const sync = () => {
       const writeOwn = !toggle.checked;
-      ai.hidden = writeOwn;
       own.hidden = !writeOwn;
-      title.required = abstract.required = writeOwn;
+      abstract.required = writeOwn;
+      personaHint.textContent = writeOwn
+        ? "Only used when AI writes your abstract."
+        : "The voice the agent writes your abstract in.";
     };
     const count = () => {
       counter.textContent = `${abstract.value.length} / ${max}`;

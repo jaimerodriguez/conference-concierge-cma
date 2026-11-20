@@ -54,12 +54,12 @@ def write_abstract(
     *,
     persona: Persona,
     track: Track,
-    topic: str,
+    title: str,
     settings: Settings | None = None,
 ) -> AbstractRun:
-    """Run one short session that writes an abstract for ``topic``.
+    """Run one short session that writes an abstract for the talk titled ``title``.
 
-    ``topic`` must already be safe: predefined, or passed through ``moderate_topic``.
+    ``title`` must already be safe: passed through ``moderate_topic``.
     """
     settings = settings or get_settings()
     managed = ManagedResources(settings.managed_dir)
@@ -75,7 +75,7 @@ def write_abstract(
             "system": build_system_prompt(settings, persona, track),
         },
         environment_id=managed.environment_id(),
-        title=f"Abstract: {topic[:60]}",
+        title=f"Abstract: {title[:60]}",
         # Guide 12 · Approvals and budgets · Step 2: cap what one audience submission can spend.
         budget=budget(settings.proposal_budget_cents),
         metadata={"persona": persona.id, "track": track.id},
@@ -87,7 +87,8 @@ def write_abstract(
             {
                 "type": "user.define_outcome",
                 "description": (
-                    f"Write a proposal for a {track.format} about this topic: {topic!r}. "
+                    f"Write a proposal for a {track.format} titled {title!r}. Keep that title "
+                    "exactly as written. "
                     f"Save it as /mnt/session/outputs/{OUTPUT_FILE}."
                 ),
                 "rubric": {"type": "text", "content": rubric},

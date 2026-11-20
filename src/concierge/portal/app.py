@@ -23,7 +23,7 @@ from starlette.templating import Jinja2Templates
 from concierge.catalog import Catalog
 from concierge.clients import get_client
 from concierge.config import Settings
-from concierge.moderation import MAX_ABSTRACT_CHARS, MAX_TITLE_CHARS, MAX_TOPIC_CHARS
+from concierge.moderation import MAX_ABSTRACT_CHARS, MAX_TITLE_CHARS
 from concierge.proposals import MAX_EMAIL_CHARS, ProposalOutcome, normalize_email, submit_proposal
 from concierge.services.store import Store
 
@@ -55,7 +55,6 @@ MAX_CONCURRENT_JOBS = 8
 
 LIMITS = {
     "email": MAX_EMAIL_CHARS,
-    "topic": MAX_TOPIC_CHARS,
     "title": MAX_TITLE_CHARS,
     "abstract": MAX_ABSTRACT_CHARS,
     "abstract_min": MIN_ABSTRACT_CHARS,
@@ -102,7 +101,7 @@ NEXT_STEPS = {
 
 @dataclass
 class Job:
-    topic: str
+    title: str
     writes_abstract: bool = True
     outcome: ProposalOutcome | None = None
     error: str | None = None
@@ -136,8 +135,7 @@ def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[Bas
                     contact_email=form["contact_email"],
                     persona_id=form["persona"],
                     track_id=form["track"],
-                    topic=form["topic"],
-                    title=None if form["ai_abstract"] else form["title"],
+                    title=form["title"],
                     abstract=None if form["ai_abstract"] else form["abstract"],
                     settings=settings,
                 )
@@ -161,22 +159,17 @@ def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[Bas
         known_tracks = {track.id for track in catalog.tracks}
         if normalize_email(form["contact_email"]) is None:
             return "Please enter a valid contact email, like sam@example.com."
-        if form["persona"] not in known_personas or form["track"] not in known_tracks:
-            return "Pick a persona and a track."
-        if form["ai_abstract"]:
-            if not form["topic"]:
-                return "Pick or type a topic."
-            if len(form["topic"]) > MAX_TOPIC_CHARS:
-                return f"Please keep the topic under {MAX_TOPIC_CHARS} characters."
-            return None
         if not form["title"]:
             return "Give your talk a title."
         if len(form["title"]) > MAX_TITLE_CHARS:
             return f"Please keep the title under {MAX_TITLE_CHARS} characters."
-        if len(form["abstract"]) < MIN_ABSTRACT_CHARS:
-            return f"Please write an abstract of at least {MIN_ABSTRACT_CHARS} characters."
-        if len(form["abstract"]) > MAX_ABSTRACT_CHARS:
-            return f"Please keep the abstract under {MAX_ABSTRACT_CHARS} characters."
+        if not form["ai_abstract"]:
+            if len(form["abstract"]) < MIN_ABSTRACT_CHARS:
+                return f"Please write an abstract of at least {MIN_ABSTRACT_CHARS} characters."
+            if len(form["abstract"]) > MAX_ABSTRACT_CHARS:
+                return f"Please keep the abstract under {MAX_ABSTRACT_CHARS} characters."
+        if form["track"] not in known_tracks or form["persona"] not in known_personas:
+            return "Pick a track and a persona."
         return None
 
     async def index(request: Request) -> Response:
@@ -192,9 +185,6 @@ def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[Bas
             "contact_email": text("contact_email"),
             "persona": text("persona"),
             "track": text("track"),
-            "topic": text("custom_topic") or text("topic"),
-            "picked_topic": text("topic"),
-            "custom_topic": text("custom_topic"),
             # An unchecked checkbox is simply missing from the form data.
             "ai_abstract": "ai_abstract" in data,
             "title": text("title"),
@@ -217,10 +207,7 @@ def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[Bas
             )
 
         job_id = secrets.token_urlsafe(8)
-        jobs[job_id] = Job(
-            topic=form["topic"] if form["ai_abstract"] else form["title"],
-            writes_abstract=form["ai_abstract"],
-        )
+        jobs[job_id] = Job(title=form["title"], writes_abstract=form["ai_abstract"])
         task = asyncio.create_task(run_job(jobs[job_id], form))
         tasks.add(task)
         task.add_done_callback(tasks.discard)

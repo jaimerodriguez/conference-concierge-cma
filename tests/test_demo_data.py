@@ -101,7 +101,7 @@ def test_sample_generate_uses_the_propose_path(
 ) -> None:
     calls: list[str] = []
 
-    def fake_submit(client, store, *, contact_email, persona_id, track_id, topic):  # type: ignore[no-untyped-def]
+    def fake_submit(client, store, *, contact_email, persona_id, track_id, title):  # type: ignore[no-untyped-def]
         calls.append(contact_email)
         member = store.find_or_add_member(contact_email, persona=persona_id)
         proposal = store.add_proposal(
@@ -109,9 +109,9 @@ def test_sample_generate_uses_the_propose_path(
             event_id="e",
             track=track_id,
             format="talk",
-            title=f"About {topic}",
+            title=title,
             abstract="...",
-            source="predefined_topic",
+            source="ai_abstract",
         )
         return NS(proposal=proposal, message="in")
 

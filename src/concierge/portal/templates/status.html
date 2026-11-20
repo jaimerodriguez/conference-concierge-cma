@@ -9,11 +9,11 @@
 {% elif not job.outcome %}
   {% if job.writes_abstract %}
   <h1>Writing your abstract...</h1>
-  <p>An agent is drafting a proposal about <b>{{ job.topic }}</b>, and a grader is checking it
+  <p>An agent is drafting the abstract for <b>{{ job.title }}</b>, and a grader is checking it
      against the rubric. This usually takes a minute or two, and this page refreshes by itself.</p>
   {% else %}
   <h1>Checking your proposal...</h1>
-  <p>We're giving <b>{{ job.topic }}</b> a quick friendliness check. This page refreshes by itself.</p>
+  <p>We're giving <b>{{ job.title }}</b> a quick friendliness check. This page refreshes by itself.</p>
   {% endif %}
   <p class="muted">Elapsed: {{ ((now - job.started_at) | int) }}s</p>
 {% elif job.outcome.accepted_for_review %}

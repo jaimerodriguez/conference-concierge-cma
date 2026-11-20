@@ -9,9 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 #### Added
 - Portal: a "Let AI generate abstract for me" checkbox, checked by default. Unchecked, the
-  person writes their own title and abstract (50 to 1,500 characters, with a live counter).
-  Both are moderated with the same house rule before they are saved (`moderate_abstract`), no
-  agent session runs, and the proposal's source is `manual_abstract`.
+  person writes their own abstract (50 to 1,500 characters, with a live counter). Title and
+  abstract are moderated together with the same house rule before they are saved
+  (`moderate_abstract`), no agent session runs, and the proposal's source is
+  `manual_abstract`.
 - Portal: email format checks in the browser and on the server (`normalize_email`).
 - Portal: after an error the form keeps what was typed; the submit button disables itself
   while a proposal is sent; the status page links to the new proposal on the board.
@@ -34,8 +35,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `concierge propose --name` is now `--email` (default `sam@example.com`). `concierge
   proposals` and `concierge data sample` show a "Contact email" column.
 - Sample speakers use `@example.com` contact emails; sample titles keep acronyms like "AI".
-- Predefined topics in `content/topics.yaml` are now AI-centered (agents, distillation,
-  training and fine-tuning, agent skills, RAG, evaluation, MCP, and more).
+- The proposal form asks, in order: contact email, talk title (always required), the AI
+  checkbox or the abstract, track, and persona. The topic list and the "type your own topic"
+  field are gone: the title is what the Abstract Writer writes about, and the stored title is
+  always the person's. `submit_proposal` and `write_abstract` take `title` instead of `topic`,
+  and `concierge propose` takes a title. Every title is moderated (there are no predefined
+  topics to skip the check). AI-written proposals have source `ai_abstract`.
+- The abstract rubric requires the title given in the task, unchanged, and the Abstract
+  Writer's prompt and description say so.
+- `content/topics.yaml` now only seeds `concierge data sample`, with AI-centered topics
+  (agents, distillation, training and fine-tuning, agent skills, RAG, evaluation, MCP, and
+  more). With `--generate`, sample titles come from the templates and are moderated too.
 - Speaker Liaison (both variants) and Scheduler prompts report the speaker's contact email
   instead of a name, since members no longer have one. Phase 2b copies updated to match.
 - Portal styling: a header with navigation, panels, and status colors; the submit button

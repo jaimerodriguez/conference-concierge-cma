@@ -171,7 +171,7 @@ def test_proposal_review_acceptance_and_perk(client: TestClient, settings: Setti
         format="lightning",
         title="Bunnies",
         abstract="A talk about bunnies.",
-        source="predefined_topic",
+        source="ai_abstract",
     )
     token = settings.eventdb_token
 
@@ -245,17 +245,25 @@ def test_portal_pages_render(settings: Settings) -> None:
     routes = build_routes(settings, Store(settings.db_path), catalog)
     with TestClient(build_app(settings, catalog=catalog, extra_routes=routes)) as portal:
         form = portal.get("/")
-        assert form.status_code == 200 and catalog.topics[0] in form.text
+        assert form.status_code == 200
         assert "Submit talk proposal" in form.text and "Let AI generate abstract" in form.text
+        # The form asks, in order: email, title, the AI checkbox (or an abstract), track, persona.
+        order = ['name="contact_email"', 'name="title"', 'name="ai_abstract"', 'name="track"']
+        positions = [form.text.index(field) for field in [*order, 'name="persona"']]
+        assert positions == sorted(positions)
+        assert 'name="topic"' not in form.text and 'name="custom_topic"' not in form.text
         assert portal.get("/board").status_code == 200
         good = {"contact_email": "sam@example.com", "persona": "weekend-hacker", "track": "fun"}
         # Every bad submission below is rejected before any model call is made.
-        bad = portal.post("/propose", data={**good, "persona": "nope", "ai_abstract": "on"})
+        ai = {**good, "title": "Mine", "ai_abstract": "on"}
+        bad = portal.post("/propose", data={**ai, "persona": "nope"})
         assert bad.status_code == 400
-        bad_email = portal.post("/propose", data={**good, "contact_email": "sam@", "topic": "x"})
+        bad_email = portal.post("/propose", data={**ai, "contact_email": "sam@"})
         assert bad_email.status_code == 400 and "valid contact email" in bad_email.text
-        # Unchecking "Let AI generate abstract" makes the title and abstract required...
-        no_abstract = portal.post("/propose", data={**good, "title": "Mine", "topic": "x"})
+        no_title = portal.post("/propose", data={**ai, "title": " "})
+        assert no_title.status_code == 400 and "title" in no_title.text
+        # Unchecking "Let AI generate abstract" makes the abstract required...
+        no_abstract = portal.post("/propose", data={**good, "title": "Mine"})
         assert no_abstract.status_code == 400 and "abstract of at least" in no_abstract.text
         # ...and what was typed comes back, so nobody retypes it.
         assert 'value="Mine"' in no_abstract.text and 'value="sam@example.com"' in no_abstract.text

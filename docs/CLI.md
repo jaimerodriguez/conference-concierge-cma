@@ -35,12 +35,12 @@ uv run concierge serve [OPTIONS]
 Submit a proposal from the terminal (the portal does the same from a phone).
 
 ```sh
-uv run concierge propose TOPIC [OPTIONS]
+uv run concierge propose TITLE [OPTIONS]
 ```
 
 | Argument or option | Default | What it does |
 | --- | --- | --- |
-| `TOPIC` | required | What the talk is about, in a sentence. |
+| `TITLE` | required | The talk's title. The agent writes the abstract. |
 | `--email` | `sam@example.com` | Member's contact email. |
 | `--persona` | `weekend-hacker` | Speaker persona id from content/personas.yaml. |
 | `--track` | `fun` | Track id from content/tracks.yaml. |

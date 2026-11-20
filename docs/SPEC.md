@@ -29,9 +29,9 @@ Non-goals: a production event platform, real email delivery, a real calendar pro
 The "AI Meetup" runs a monthly event. Before each event:
 
 1. **Members propose talks.** Anyone at the event can open the portal on their phone, enter a
-   contact email, pick a track, and either let an agent write the abstract (pick a persona and
-   a topic, or type their own) or write their own title and abstract. The proposal board
-   groups every proposal as Accepted, Reviewed, Not this time, or Awaiting review.
+   contact email and a talk title, and either let an agent write the abstract (in the voice of
+   a persona they pick) or write their own. They also pick a track. The proposal board groups
+   every proposal as Accepted, Reviewed, Not this time, or Awaiting review.
 2. **Every morning, the Program Chair reviews new proposals.** A scheduled run fans out the
    new proposals to CFP Reviewers, who score each against the base rubric plus its track
    rubric. The chair writes a digest.
@@ -67,7 +67,7 @@ This gives the demo its arc: an audience member becomes a speaker, live.
 | `id`, `member_id`, `event_id` | |
 | `track` | One of the configured tracks (§3.3) |
 | `title`, `abstract`, `format` | `format`: talk (25 min) or lightning (5 min) |
-| `source` | `predefined_topic`, `custom_topic` (passed moderation), or `typed` |
+| `source` | `ai_abstract` (the Abstract Writer wrote it), `manual_abstract` (the person did), or `sample` |
 | `status` | `submitted` → `reviewed` → `accepted` / `waitlisted` / `declined` |
 | `scores` | Per-criterion scores written by the CFP Reviewer |
 
@@ -98,9 +98,10 @@ demo can show switching venues: a tech office and a public library.
 
 ### 3.5 Personas and topics
 
-`content/personas.yaml` and `content/topics.yaml` hold predefined entries for the portal
-("Weekend hacker", "Data engineer", "Community organizer"…; "Building AI agents",
-"Model distillation", "Writing agent skills"…). Predefined entries skip moderation.
+`content/personas.yaml` holds the portal's personas ("Weekend hacker", "Data engineer",
+"Community organizer"…). `content/topics.yaml` holds AI topics ("Building AI agents",
+"Model distillation", "Writing agent skills"…) that `concierge data sample` builds sample talks
+around. The portal does not offer topics: the person's title is what the agent writes about.
 
 ---
 
@@ -144,9 +145,9 @@ where noted.
 | **Scheduler** | Sonnet 5.5 | ant | Plans slots, books calendar events as the organizer | Calendar MCP (OAuth, `always_ask` on create); Event DB MCP |
 | **Speaker Liaison** | Haiku 5.5 | ant | Issues CloudCredits perk codes, drafts welcome notes | bash (curl with vault env var); Event DB MCP |
 | **Attendee Helper** | Haiku 5.5 | ant | Answers attendee questions | venues memory (read-only), ops-notes (read-only) |
-| **Abstract Writer** | Haiku 5.5 base | ant (base) + **on-the-fly overrides** per request | Turns persona + topic + track into a title and abstract | agent toolset (write only) |
+| **Abstract Writer** | Haiku 5.5 base | ant (base) + **on-the-fly overrides** per request | Writes an abstract for the person's title, persona, and track | agent toolset (write only) |
 | **Speaker Bio Writer** | Haiku 5.5 | **created at runtime** with `agents.create` (guarded, created once) | Writes a short bio for an accepted speaker | none beyond write |
-| **Moderator** | Haiku 5.5 | *Not an agent.* One Messages API call with structured output | Allows or rejects a typed topic | n/a |
+| **Moderator** | Haiku 5.5 | *Not an agent.* One Messages API call with structured output | Allows or rejects a typed title, or a title and abstract | n/a |
 
 The Moderator is deliberately a single API call: a teaching point that not every step needs an
 agent.
@@ -200,10 +201,10 @@ read-only), which also blocks memory poisoning from the public.
 
 ### 5.2 Safety for audience input
 
-1. Predefined personas and topics skip moderation.
-2. Typed topics go to the Moderator (Haiku 5.5, structured output: `allowed`, `reason`,
+1. Personas and tracks are picked from lists, so they need no check.
+2. Every typed title goes to the Moderator (Haiku 5.5, structured output: `allowed`, `reason`,
    `suggestion`). Rejects sexual, violent, hateful or harassing content, real private people,
-   and anything not respectful. Rejection shows a friendly "try another topic" with a suggestion.
+   and anything not respectful. Rejection shows a friendly "try something else" with a suggestion.
    A title and abstract a person writes themselves go through the same check, with the same
    house rule, before they are saved.
 3. The Abstract Writer's prompt repeats the content rules (defense in depth).
@@ -212,7 +213,7 @@ read-only), which also blocks memory poisoning from the public.
 ### 5.3 Key flows
 
 **Propose a talk (on-the-fly agent + outcome).**
-Portal → moderation (if typed) → `sessions.create` with `agent_with_overrides` (system prompt
+Portal → moderation of the title → `sessions.create` with `agent_with_overrides` (system prompt
 built from persona + track, `budget`) and `initial_events: [user.define_outcome]` whose rubric is
 base + track template → stream until idle → read `abstract.json` from the session → save the
 proposal through the services API. When the person writes their own abstract, the portal
@@ -375,7 +376,7 @@ names the file and the `Step N` marker to search for. In code, markers look like
 ## 9. Demo script (about 20 minutes)
 
 1. The setup: show `managed/`, run `ant apply --dry-run`, then apply. (Guide 01)
-2. Audience submits talks from phones; one typed topic gets moderated. (03, 11, 13)
+2. Audience submits talks from phones; each typed title gets moderated. (03, 11, 13)
 3. Fire the daily review manually; watch the workflow run fan out in the Console. (08, 10)
 4. Accept talks; build the agenda; advisor consult; approve calendar bookings live. (09, 12, 07)
 5. Speaker Liaison issues a perk; show the placeholder for `$CLOUDCREDITS_API_KEY`. (06)

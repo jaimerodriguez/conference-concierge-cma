@@ -1,4 +1,5 @@
-# Predefined topics for the proposal form. Predefined entries skip moderation.
+# Topics for `concierge data sample`: each sample talk is built around one of these.
+# The proposal form no longer offers topics; people type a title instead.
 - Building AI agents
 - Model distillation
 - Training and fine-tuning models

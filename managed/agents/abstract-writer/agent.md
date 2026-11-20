@@ -3,7 +3,7 @@
 # Every session needs a stored agent. This one is a minimal base: each request overrides its
 # system prompt (persona, track) for that session only. See src/concierge/abstracts.py.
 name: abstract-writer
-description: Turns a persona, a topic, and a track into a talk title and abstract.
+description: Writes a talk abstract for a speaker's title, persona, and track.
 model: claude-haiku-5-5
 tools:
   - type: agent_toolset_20260401

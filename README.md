@@ -30,7 +30,7 @@ Search the repo for `Guide 05 ·` to see every step of a guide in place.
 | Scheduled agents | The daily proposal review | [10](docs/guides/10-scheduling-an-agent.md) |
 | Outcomes | Abstracts and the review digest, graded against rubrics | [11](docs/guides/11-grading-with-outcomes.md) |
 | Approvals and budgets | The organizer approves each booking and perk code | [12](docs/guides/12-approvals-and-budgets.md) |
-| Input moderation | Topics typed by the audience | [13](docs/guides/13-moderating-user-input.md) |
+| Input moderation | Titles and abstracts typed by the audience | [13](docs/guides/13-moderating-user-input.md) |
 | Self-hosted sandbox (phase 2a) | Tools run in your container | [20](docs/guides/20-self-hosted-sandbox.md) |
 | Self-hosted Managed Agents (phase 2b) | You run the service; see what you keep and lose | [21](docs/guides/21-migrating-to-self-hosted-managed-agents.md) |
 

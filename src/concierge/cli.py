@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 from typing import Annotated, Any
 from urllib.parse import urlsplit
@@ -484,7 +485,7 @@ def auth_calendar(
 
 @app.command()
 def propose(
-    topic: Annotated[str, typer.Argument(help="What the talk is about, in a sentence.")],
+    title: Annotated[str, typer.Argument(help="The talk's title. The agent writes the abstract.")],
     email: Annotated[str, typer.Option(help="Member's contact email.")] = "sam@example.com",
     persona: Annotated[
         str, typer.Option(help="Speaker persona id from content/personas.yaml.")
@@ -503,7 +504,7 @@ def propose(
             contact_email=email,
             persona_id=persona,
             track_id=track,
-            topic=topic,
+            title=title,
         )
     if outcome.proposal:
         console.print(f"[bold]{outcome.proposal['title']}[/bold]  ({outcome.proposal['id']})")
@@ -650,7 +651,12 @@ def data_sample(
     created.
     """
     from concierge.catalog import get_catalog
-    from concierge.sample_data import GENERATE_CENTS_EACH, create_offline, plan_samples
+    from concierge.sample_data import (
+        GENERATE_CENTS_EACH,
+        create_offline,
+        plan_samples,
+        sample_title,
+    )
     from concierge.services.store import Store
 
     settings = get_settings()
@@ -674,6 +680,7 @@ def data_sample(
         raise typer.Exit(1)
     client = _client()
     created = []
+    rng = random.Random(seed)
     for number, plan in enumerate(plan_samples(catalog, count, seed), start=1):
         with console.status(f"Writing abstract {number} of {count} ({plan.contact_email})..."):
             outcome = submit_proposal(
@@ -682,7 +689,7 @@ def data_sample(
                 contact_email=plan.contact_email,
                 persona_id=plan.persona.id,
                 track_id=plan.track.id,
-                topic=plan.topic,
+                title=sample_title(plan, rng),
             )
         if outcome.proposal:
             created.append(outcome.proposal)

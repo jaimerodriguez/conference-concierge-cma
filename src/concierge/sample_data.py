@@ -3,8 +3,9 @@
 Two ways to make proposals:
 - offline (the default): free and instant. Titles and abstracts come from the templates
   below, filled with the predefined personas, topics, and tracks in content/.
-- generated: each abstract is written by the Abstract Writer, through the same code
-  `concierge propose` uses. About a cent each.
+- generated: each title comes from the templates below, and the Abstract Writer writes its
+  abstract through the same code `concierge propose` uses (moderation included). About a
+  cent each.
 
 Everything here touches only the local SQLite store. Nothing in the Anthropic workspace
 (agents, vaults, memory stores, sessions, the deployment) is created or removed.
@@ -130,13 +131,18 @@ def _spread[T](rng: random.Random, items: list[T], count: int) -> list[T]:
 def write_offline(plan: SamplePlan, rng: random.Random) -> tuple[str, str]:
     """A title and abstract from the templates, with no model call."""
     topic = plan.topic
-    template = rng.choice(_TITLES.get(plan.track.id, _TITLES["fun"]))
-    title = template.format(Topic=_title_case(topic))
+    title = sample_title(plan, rng)
     opener = _OPENERS.get(plan.persona.id, "I have been exploring {topic} for a while.")
     abstract = (
         f"{opener.format(topic=_mid_sentence(topic))} {rng.choice(_BODIES[plan.track.format])}"
     )
     return title, abstract
+
+
+def sample_title(plan: SamplePlan, rng: random.Random) -> str:
+    """A talk title built from the plan's topic, such as "Model Distillation for Everyone"."""
+    template = rng.choice(_TITLES.get(plan.track.id, _TITLES["fun"]))
+    return template.format(Topic=_title_case(plan.topic))
 
 
 def _title_case(text: str) -> str:
