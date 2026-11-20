@@ -1,0 +1,13 @@
+# Tracks. Each id must have a rubric at content/rubrics/tracks/<id>.md.
+- id: ai-ml
+  name: AI and machine learning
+  format: talk
+- id: community
+  name: Community
+  format: talk
+- id: lightning
+  name: Lightning talks
+  format: lightning
+- id: fun
+  name: Just for fun
+  format: lightning

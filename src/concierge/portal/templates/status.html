@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Your proposal{% endblock %}
+{% block head %}{% if not job.outcome and not job.error %}<meta http-equiv="refresh" content="3">{% endif %}{% endblock %}
+{% block body %}
+{% if job.error %}
+  <h1>Something went wrong</h1>
+  <p>Please try again in a moment.</p>
+{% elif not job.outcome %}
+  <h1>Writing your abstract...</h1>
+  <p>An agent is drafting a proposal about <b>{{ job.topic }}</b>, and a grader is checking it
+     against the rubric. This page refreshes by itself.</p>
+{% elif job.outcome.accepted_for_review %}
+  <h1>{{ job.outcome.proposal.title }}</h1>
+  <p><span class="pill">{{ job.outcome.proposal.track }}</span> <span class="pill">{{ job.outcome.proposal.format }}</span></p>
+  <div class="card">{{ job.outcome.proposal.abstract }}</div>
+  <p>{{ job.outcome.message }}</p>
+{% else %}
+  <h1>Let's try another topic</h1>
+  <p>{{ job.outcome.message }}</p>
+  {% if job.outcome.suggestion %}<p>How about: <b>{{ job.outcome.suggestion }}</b>?</p>{% endif %}
+  <p><a href="{{ url_for('index') }}">Back to the form</a></p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>{{ catalog.event.name }}</h1>
+<p>Pick who you are and what you'd talk about. An agent writes your abstract.</p>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post" action="{{ url_for('propose') }}">
+  <label>Your first name
+    <input name="name" maxlength="40" placeholder="Sam" required>
+  </label>
+  <label>Persona
+    <select name="persona">
+      {% for persona in catalog.personas %}<option value="{{ persona.id }}">{{ persona.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Topic
+    <select name="topic">
+      {% for topic in catalog.topics %}<option>{{ topic }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>...or type your own topic
+    <input name="custom_topic" maxlength="80" placeholder="Leave empty to use the list">
+  </label>
+  <p class="muted">Typed topics are checked first. Keep it friendly: nothing sexual or violent.</p>
+  <label>Track
+    <select name="track">
+      {% for track in catalog.tracks %}<option value="{{ track.id }}">{{ track.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <button type="submit">Write my abstract</button>
+</form>
+{% endblock %}

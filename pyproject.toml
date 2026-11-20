@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "conference-concierge"
+version = "0.1.0"
+description = "An educational Claude Managed Agents demo: agents that run a user-group meetup."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=2.10",
+    "httpx>=0.27",
+    "jinja2>=3.1",
+    "mcp>=2,<3",
+    "opentelemetry-exporter-otlp-proto-http>=1.30",
+    "opentelemetry-sdk>=1.30",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "python-multipart>=0.0.9",
+    "pyyaml>=6",
+    "starlette>=0.40",
+    "typer>=0.12",
+    "uvicorn>=0.30",
+]
+
+[project.scripts]
+concierge = "concierge.cli:entry_point"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/concierge"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "phase2"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort
+    "B",       # bugbear
+    "UP",      # pyupgrade
+    "SIM",     # simplify
+    "C4",      # comprehensions
+    "PTH",     # pathlib over os.path
+    "RUF",     # ruff-specific
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/concierge/cli.py" = ["B008"]  # Typer uses function calls in defaults by design
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["src", "."]

@@ -1,0 +1,16 @@
+# Predefined personas for the proposal form. Predefined entries skip moderation.
+- id: weekend-hacker
+  name: Weekend hacker
+  voice: Enthusiastic tinkerer who builds things on Saturday mornings and loves a good hack.
+- id: data-engineer
+  name: Data engineer
+  voice: Pragmatic and precise; has been paged at 3 AM and wants you to avoid that.
+- id: community-organizer
+  name: Community organizer
+  voice: Warm storyteller who cares most about people showing up and feeling welcome.
+- id: curious-student
+  name: Curious student
+  voice: New to the field, asks the questions everyone else is afraid to ask.
+- id: startup-founder
+  name: Startup founder
+  voice: Fast-talking and optimistic, with at least one lesson learned the hard way.

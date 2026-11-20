@@ -1,0 +1,80 @@
+# Guide 10 · Scheduling an agent · Step 1: declare the deployment
+# Each firing creates a new session for the Program Chair. Nobody is attached when it runs,
+# so every tool the review needs must run without asking (see the Event DB toolset policy
+# in agents/program-chair/agent.md and agents/cfp-reviewer/agent.md).
+name: daily-proposal-review
+agent: ../agents/program-chair/agent.md
+environment_id: ../environments/cloud.yaml
+
+# Guide 10 · Step 2: vault IDs are IDs, not paths. Apply the vault first, then paste its
+# vlt_... ID from claude-lock.json here (`concierge setup show` prints it) and apply again.
+vault_ids: []
+
+resources:
+  - ../memory_stores/rubrics.yaml
+  - ../memory_stores/ops-notes.yaml
+
+# Guide 10 · Step 3: the schedule. Wall-clock time in the given IANA timezone.
+schedule:
+  type: cron
+  expression: "0 8 * * *"
+  timezone: America/Los_Angeles
+
+# Guide 12 · Approvals and budgets · Step 3: a hard cap copied onto every fired session.
+# Minor units as a string: "500" is $5.00.
+budget:
+  type: limit
+  max_list_cost: {amount: "500", currency: USD}
+
+# Guide 11 · Grading work with outcomes · Step 2: the run's job is one deliverable, so it
+# starts with an outcome instead of a message. `concierge review run --direct` reuses this
+# exact block, so the rubric lives in one place.
+initial_events:
+  - type: user.define_outcome
+    description: |
+      Run the daily proposal review.
+      1. First list the proposals whose status is "submitted". That list is the START STATE:
+         remember its count and ids. Only those proposals are in scope. Proposals with any
+         other status (for example "reviewed") are out of scope, even if a review was recorded
+         for them recently: do not list them or count them. If you are asked to revise your
+         work, keep the same start state: do not list the proposals again, because reviewing
+         them has already changed their status.
+      2. Have every proposal in the start state reviewed. Reviewers record their own reviews.
+         Wait for each reviewer's reply before you read reviews back from the Event DB: until
+         it replies, its reviews are not there yet, and that does not mean it failed.
+      3. Write the digest to /mnt/session/outputs/digest.md, with exactly these parts in order:
+         - First line: the start state: how many proposals were submitted when the run began,
+           and their ids.
+         - A one-paragraph summary: how many were reviewed, and how many per track.
+         - A table with one row per proposal in the start state: id, title, track, overall
+           score, recommendation.
+         - "Top three": the three best proposals (all of them when fewer than three were
+           reviewed), one sentence each on why.
+         - "Respectful": name any proposal that failed the "Respectful" criterion, or say that
+           none did.
+         - "Not covered": only if a proposal in the start state has no review, with the reason.
+         Add no other sections.
+      If the start state is empty there is nothing to review: the digest is that first line plus
+      the sentence "Nothing to review.", and nothing else.
+    max_iterations: 3
+    rubric:
+      type: text
+      content: |
+        # Daily review digest rubric
+        Judge the digest against the start state it declares in its first line. Do not try to
+        work out what was submitted from timestamps or from other proposals in the database:
+        proposals that were not in the declared start state are out of scope.
+        - The output is a single file /mnt/session/outputs/digest.md.
+        - Its first line states the start state: the number of proposals that were submitted
+          when the run began, and their ids (or "0").
+        - If the start state is 0, the digest is that line plus "Nothing to review." and has no
+          table and no other sections. Meeting this is enough: do not ask for more.
+        - Otherwise it continues with a one-paragraph summary: how many were reviewed, and how
+          many per track.
+        - Otherwise it has a table with one row per proposal in the start state: title, track,
+          overall score, recommendation. Every id in the start state appears in the table, or is
+          listed under "Not covered" with a reason. No other proposals appear.
+        - Otherwise it lists the top three proposals with one sentence each on why (or all of
+          them when fewer than three were reviewed).
+        - Otherwise it flags any proposal that failed the "Respectful" criterion.
+        - No placeholder text, TODOs, or empty sections remain.

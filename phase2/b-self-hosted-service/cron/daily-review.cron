@@ -1,0 +1,8 @@
+# Guide 21 · Migrating to self-hosted Managed Agents · Step 6: replace the deployment with cron
+# A self-hosted server has no scheduled deployments, so your own scheduler starts the session.
+# `--direct` creates an ordinary session with the same kickoff the hosted deployment used.
+#
+# Install with `crontab -e`. Adjust the paths. Cron has a minimal environment, so the command
+# loads the variables it needs from a file that only your user can read (chmod 600).
+CRON_TZ=America/Los_Angeles
+0 8 * * * cd /path/to/conference-concierge && set -a && . ./.env.selfhosted && set +a && .venv/bin/concierge review run --direct >> .concierge/daily-review.log 2>&1

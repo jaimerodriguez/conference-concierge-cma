@@ -1,0 +1,4 @@
+name: rubrics
+description: >-
+  Scoring rubrics for talk proposals. base.md applies to every proposal; tracks/<track-id>.md
+  adds the criteria for one track. Reference material maintained by organizers.

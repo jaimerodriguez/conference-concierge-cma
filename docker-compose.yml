@@ -1,0 +1,11 @@
+# Guide 05 · Wiring up OpenTelemetry · Step 5: a local place to look at traces
+# Starts Jaeger, which accepts OTLP directly and shows traces at http://localhost:16686
+#
+#   docker compose up -d
+#   export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+services:
+  jaeger:
+    image: jaegertracing/jaeger:latest  # pin a version before demo day
+    ports:
+      - "16686:16686"  # the Jaeger UI
+      - "4318:4318"    # OTLP over HTTP: where this demo's processes send spans

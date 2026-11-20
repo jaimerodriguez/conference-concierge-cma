@@ -221,3 +221,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Conference Concierge local state (SQLite database, runtime IDs)
+.concierge/
+
+# Per-person IDs written by `ant apply`
+managed/claude-lock.json
+phase2/**/claude-lock.json
