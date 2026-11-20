@@ -1,0 +1,6 @@
+# Guide 04 · Giving agents system-level memory · Step 1: declare the stores
+# Memory stores belong to the workspace, not to a user. The description is written for the agent.
+name: venues
+description: >-
+  Venue profiles for the meetup, one markdown file per venue: address, transit, parking, wifi,
+  rooms, AV, accessibility, food, and house rules. Reference material maintained by organizers.

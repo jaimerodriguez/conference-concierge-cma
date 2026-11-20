@@ -1,0 +1,6 @@
+# Guide 20 · Moving tools into your own sandbox · Step 1: declare a self-hosted environment
+# The agent loop stays at Anthropic; tools run in a worker you run (phase2/a-self-hosted-sandbox).
+# `{type: self_hosted}` is the whole config: networking and capacity are yours to control.
+name: concierge-self-hosted
+config:
+  type: self_hosted

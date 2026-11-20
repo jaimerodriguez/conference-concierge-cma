@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Proposal board{% endblock %}
+{% block body %}
+<h1>Proposal board</h1>
+<p class="muted">{{ proposals|length }} proposals for {{ catalog.event.name }}.</p>
+{% for proposal in proposals %}
+<div class="card">
+  <b>{{ proposal.title }}</b><br>
+  <span class="muted">{{ proposal.speaker_name }}</span>
+  <span class="pill">{{ proposal.track }}</span>
+  <span class="pill">{{ proposal.status }}</span>
+  {% if proposal.overall %}<span class="pill">score {{ proposal.overall }}</span>{% endif %}
+</div>
+{% else %}
+<p>No proposals yet. Be the first!</p>
+{% endfor %}
+{% endblock %}

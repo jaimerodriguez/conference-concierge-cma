@@ -1,0 +1,23 @@
+# Guide 20 · Moving tools into your own sandbox · Step 2: run the worker
+#   export ANTHROPIC_ENVIRONMENT_ID=env_...       (from `concierge setup show`)
+#   export ANTHROPIC_ENVIRONMENT_KEY=sk-ant-oat01-...   (Console: the environment's page)
+#   docker compose up --build
+services:
+  worker:
+    build: .
+    environment:
+      ANTHROPIC_ENVIRONMENT_ID: ${ANTHROPIC_ENVIRONMENT_ID:?set ANTHROPIC_ENVIRONMENT_ID}
+      ANTHROPIC_ENVIRONMENT_KEY: ${ANTHROPIC_ENVIRONMENT_KEY:?set ANTHROPIC_ENVIRONMENT_KEY}
+      # Optional: send tool spans to the collector from the repo's top-level docker-compose.yml.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    # Basic hardening. Egress rules are yours too: this container can reach whatever your
+    # network allows, so restrict it to what the agents need.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /workspace:uid=10001,gid=10001
+      - /mnt/memory:uid=10001,gid=10001
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # Give the worker time to sync memory before a hard kill.
+    stop_grace_period: 45s

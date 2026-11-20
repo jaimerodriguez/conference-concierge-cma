@@ -1,0 +1,12 @@
+# The sample event. `venue` is the filename (without .md) under content/venues/.
+id: bay-city-ai-meetup-2026-12
+name: AI Meetup, December 2026
+date: "2026-12-10"
+doors_open: "17:30"
+talks_start: "18:30"
+talks_end: "21:00"
+venue: harbor-tech-hub
+slots:
+  talk_minutes: 25
+  lightning_minutes: 5
+  break_minutes: 10

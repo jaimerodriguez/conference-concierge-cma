@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Propose a talk{% endblock %}</title>
+  {% block head %}{% endblock %}
+  <style>
+    :root { color-scheme: light dark; --accent: #c2410c; }
+    body { font-family: system-ui, sans-serif; max-width: 34rem; margin: 0 auto; padding: 1.25rem 1rem 3rem; line-height: 1.5; }
+    h1 { font-size: 1.5rem; margin-bottom: .25rem; }
+    nav a { margin-right: 1rem; }
+    label { display: block; margin-top: 1rem; font-weight: 600; }
+    input, select { width: 100%; padding: .6rem; font-size: 1rem; box-sizing: border-box; margin-top: .25rem; }
+    button { margin-top: 1.25rem; padding: .7rem 1.2rem; font-size: 1rem; background: var(--accent); color: white; border: 0; border-radius: .4rem; }
+    .error { color: #b00020; font-weight: 600; }
+    .card { border: 1px solid #8884; border-radius: .5rem; padding: .75rem 1rem; margin-top: 1rem; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .pill { display: inline-block; padding: 0 .5rem; border-radius: 1rem; border: 1px solid #8886; font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <nav><a href="{{ url_for('index') }}">Propose a talk</a><a href="{{ url_for('board') }}">Proposal board</a></nav>
+  {% block body %}{% endblock %}
+</body>
+</html>
