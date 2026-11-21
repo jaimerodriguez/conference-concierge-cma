@@ -28,7 +28,7 @@ needs no setup. Add OpenTelemetry when you want traces in your own tools.
 
 | Setting | Where | What it does |
 |---|---|---|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Your shell (`export`); the demo does not read this one from `.env` | Where spans go. `http://localhost:4318` is the local Jaeger. **Unset means tracing is off**: nothing is recorded or sent. This is a standard OTel variable, so the exporter also honors the other standard ones, such as `OTEL_EXPORTER_OTLP_HEADERS` for a backend that needs an API key. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `.env` (an `export` in your shell wins if both are set) | Where spans go. `http://localhost:4318` is the local Jaeger. **Unset means tracing is off**: nothing is recorded or sent. This is a standard OTel variable, so the exporter also honors the other standard ones, such as `OTEL_EXPORTER_OTLP_HEADERS` for a backend that needs an API key. |
 | `CONCIERGE_OTEL_CONTENT_MODE` | `.env` (or your shell) | How much detail spans carry: `metadata_only` (the demo's default) or `content`. See *Content mode* below. |
 | Service name | Code, not a setting | How a process appears in Jaeger: `concierge-cli` for terminal commands, `concierge-portal` for `concierge services`. |
 
@@ -118,7 +118,7 @@ Reference: [OpenTelemetry for the Claude API](https://platform.claude.com/docs/e
 ```sh
 # From the root of the repository, where docker-compose.yml is
 docker compose up -d                              # starts Jaeger
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+# In .env, uncomment: OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 uv run concierge propose "Running models locally"  # the argument is the talk's title
 open http://localhost:16686                       # pick service concierge-cli, then Find Traces
 ```

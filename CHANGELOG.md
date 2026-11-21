@@ -19,8 +19,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Fixed
 - `docs/SPEC.md` and `telemetry.py` no longer mention an OpenTelemetry Collector; the demo
   sends spans straight to Jaeger.
-- Guide 05 and `.env.example` now say to `export OTEL_EXPORTER_OTLP_ENDPOINT` in the shell:
-  the demo reads only `CONCIERGE_*` settings from `.env`.
+- `OTEL_EXPORTER_OTLP_ENDPOINT` (and any other `OTEL_*` variable) set in `.env` was ignored,
+  so tracing stayed off. `setup_telemetry` now copies `OTEL_*` variables from `.env` into the
+  environment (`load_otel_env`); a value exported in the shell still wins. Guide 05 and
+  `.env.example` recommend `.env` again. `python-dotenv` is now a direct dependency.
 
 #### Added
 - Docs: flow visuals in `docs/images/`: who does the work (README), the guide map (README and

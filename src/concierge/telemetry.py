@@ -14,6 +14,7 @@ When both are on, the API's spans nest under the SDK's span of the same request.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 from opentelemetry import trace
@@ -24,15 +25,36 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 _provider: TracerProvider | None = None
 
 
+def load_otel_env(env_file: Path | None = None) -> None:
+    """Copy ``OTEL_*`` variables from the repo's ``.env`` into the process environment.
+
+    The OpenTelemetry exporter reads only the process environment, while the demo's own
+    settings (``CONCIERGE_*``) come from ``.env``. Copying the standard ``OTEL_*`` variables
+    (endpoint, headers, and the rest) lets them live in ``.env`` too. A variable already set
+    in the shell wins, so ``export`` still overrides the file.
+    """
+    from dotenv import dotenv_values
+
+    from concierge.config import REPO_ROOT
+
+    path = env_file if env_file is not None else REPO_ROOT / ".env"
+    if not path.is_file():
+        return
+    for key, value in dotenv_values(path).items():
+        if key.startswith("OTEL_") and value is not None and key not in os.environ:
+            os.environ[key] = value
+
+
 def setup_telemetry(service_name: str) -> TracerProvider | None:
     """Register a tracer provider once per process. Returns ``None`` when tracing is off.
 
-    Tracing is on when ``OTEL_EXPORTER_OTLP_ENDPOINT`` is set (for example to the Jaeger
-    in ``docker-compose.yml``).
+    Tracing is on when ``OTEL_EXPORTER_OTLP_ENDPOINT`` is set, in ``.env`` or the shell (for
+    example to the Jaeger in ``docker-compose.yml``).
     """
     global _provider
     if _provider is not None:
         return _provider
+    load_otel_env()
     if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
         return None
 
