@@ -13,10 +13,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rewrites Step 6 to say what API tracing adds, how an admin turns it on, why the local
   Jaeger cannot receive it, and how the two halves join into one trace; updates *Try it* to
   the title-based `propose` command.
+- Guide 05: a *Content mode* section (what `metadata_only` and `content` show in Jaeger,
+  where to change it, and the privacy caution) and a *Try it* step for switching to `content`.
 
 #### Fixed
 - `docs/SPEC.md` and `telemetry.py` no longer mention an OpenTelemetry Collector; the demo
   sends spans straight to Jaeger.
+- Guide 05 and `.env.example` now say to `export OTEL_EXPORTER_OTLP_ENDPOINT` in the shell:
+  the demo reads only `CONCIERGE_*` settings from `.env`.
 
 #### Added
 - Docs: flow visuals in `docs/images/`: who does the work (README), the guide map (README and

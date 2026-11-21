@@ -28,14 +28,37 @@ needs no setup. Add OpenTelemetry when you want traces in your own tools.
 
 | Setting | Where | What it does |
 |---|---|---|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `.env` or your shell | Where spans go. `http://localhost:4318` is the local Jaeger. **Unset means tracing is off**: nothing is recorded or sent. This is a standard OTel variable, so the exporter also honors the other standard ones, such as `OTEL_EXPORTER_OTLP_HEADERS` for a backend that needs an API key. |
-| `CONCIERGE_OTEL_CONTENT_MODE` | `.env` | `metadata_only` (default) or `content`. See *What to notice*. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Your shell (`export`); the demo does not read this one from `.env` | Where spans go. `http://localhost:4318` is the local Jaeger. **Unset means tracing is off**: nothing is recorded or sent. This is a standard OTel variable, so the exporter also honors the other standard ones, such as `OTEL_EXPORTER_OTLP_HEADERS` for a backend that needs an API key. |
+| `CONCIERGE_OTEL_CONTENT_MODE` | `.env` (or your shell) | How much detail spans carry: `metadata_only` (the demo's default) or `content`. See *Content mode* below. |
 | Service name | Code, not a setting | How a process appears in Jaeger: `concierge-cli` for terminal commands, `concierge-portal` for `concierge services`. |
 
 | Port | Who listens | Used for |
 |---|---|---|
 | `16686` | Jaeger | The Jaeger web page you open in a browser. |
 | `4318` | Jaeger | OTLP over HTTP: the demo's processes send spans here. Jaeger accepts OTLP directly, so no separate collector is needed. |
+
+## Content mode: how much detail you see
+
+The demo ships with `metadata_only`. Both modes come from the SDK; the demo only passes your
+choice through.
+
+| Mode | What a span carries | What you see in Jaeger |
+|---|---|---|
+| `metadata_only` (default) | IDs, timing, status, token counts, model and tool names | The shape of the work: which steps ran, how long each took, how many tokens it used |
+| `content` | All of the above, plus prompts, responses, and tool inputs and outputs | The same spans, with the actual text: open a span and look for `gen_ai.input.messages` and `gen_ai.output.messages` under *Tags* |
+
+To change it, edit this line in `.env` (copied from `.env.example`) and run the command again:
+```sh
+CONCIERGE_OTEL_CONTENT_MODE=content
+```
+The demo reads it in `src/concierge/config.py` (`otel_content_mode`) and passes it to the SDK
+in `src/concierge/clients.py` through `sdk_telemetry_option` (Step 3). It is read when a
+process starts, so restart `concierge services` after changing it.
+
+**Before you switch to `content`:** prompts include what audience members typed (titles and
+abstracts). Your backend then keeps that text under its own access and retention
+rules. The local Jaeger forgets it when the container stops; a hosted backend may not. Switch
+back to `metadata_only` before you point at a shared backend.
 
 ## Steps
 
@@ -103,10 +126,15 @@ Open the `concierge.submit_proposal` trace. You see your own span with moderatio
 agent session nested inside it, each with its timing and token counts. `docker compose down`
 stops Jaeger and discards the traces.
 
+To see the content too, set `CONCIERGE_OTEL_CONTENT_MODE=content` in `.env`, run the same
+`propose` command again, and open the new trace. The spans are the same, but they now carry
+text: the moderation span, for example, shows the prompt with the title you typed and the
+model's verdict. Set it back to `metadata_only` when you are done.
+
 ## What to notice
-- **Content mode.** `metadata_only` (the default) exports IDs, timing, and token counts.
-  `CONCIERGE_OTEL_CONTENT_MODE=content` also exports prompts and responses: your backend
-  then stores audience input under its own access and retention rules.
+- **Content mode** is a privacy choice, not just a detail level: `content` sends audience
+  input to your backend (see *Content mode* above). API tracing has its own content mode,
+  set per destination by the admin (Step 6).
 - Spans use the OpenTelemetry GenAI conventions (`gen_ai.*`).
 - OpenTelemetry export is in beta; span names and attributes can change, so pin the SDK.
 - In phase 2a the worker emits the tool spans (Guide 20).
