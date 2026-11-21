@@ -126,7 +126,7 @@ around. The portal does not offer topics: the person's title is what the agent w
          /credits/api  CloudCredits sponsor API (API key header)
          SQLite storage
 
- Local: OpenTelemetry Collector + Jaeger (docker compose); `concierge` CLI (Typer).
+ Local: Jaeger, which accepts OTLP directly (docker compose); `concierge` CLI (Typer).
 ```
 
 Why one services app: a single public tunnel URL (for example `cloudflared` or `ngrok`) keeps the

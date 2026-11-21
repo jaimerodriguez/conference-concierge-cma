@@ -7,6 +7,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### 2026-11-20
 
+#### Changed
+- Guide 05 (OpenTelemetry): explains OpenTelemetry, OTLP, and Jaeger for newcomers; adds a
+  settings table (environment variables, service names) and a ports table (16686, 4318);
+  rewrites Step 6 to say what API tracing adds, how an admin turns it on, why the local
+  Jaeger cannot receive it, and how the two halves join into one trace; updates *Try it* to
+  the title-based `propose` command.
+
+#### Fixed
+- `docs/SPEC.md` and `telemetry.py` no longer mention an OpenTelemetry Collector; the demo
+  sends spans straight to Jaeger.
+
 #### Added
 - Docs: flow visuals in `docs/images/`: who does the work (README), the guide map (README and
   guides index), and an all-in-one journey for presentations. Editable HTML source and a

@@ -3,7 +3,8 @@
 Two independent sources of spans exist (see docs/guides/05-wiring-up-opentelemetry.md):
 
 * **SDK tracing** (this file): the Claude SDK emits spans in *this* process and our exporter
-  sends them to the collector.
+  sends them to your backend
+  (Jaeger, locally).
 * **API tracing**: Anthropic emits server-side spans (model requests, agent turns, tool runs)
   to a destination an organization admin adds. No code; the guide covers it.
 
@@ -26,7 +27,7 @@ _provider: TracerProvider | None = None
 def setup_telemetry(service_name: str) -> TracerProvider | None:
     """Register a tracer provider once per process. Returns ``None`` when tracing is off.
 
-    Tracing is on when ``OTEL_EXPORTER_OTLP_ENDPOINT`` is set (for example to the collector
+    Tracing is on when ``OTEL_EXPORTER_OTLP_ENDPOINT`` is set (for example to the Jaeger
     in ``docker-compose.yml``).
     """
     global _provider
