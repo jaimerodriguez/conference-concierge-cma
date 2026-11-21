@@ -8,7 +8,7 @@ environment_id: ../environments/cloud.yaml
 
 # Guide 10 · Step 2: vault IDs are IDs, not paths. Apply the vault first, then paste its
 # vlt_... ID from claude-lock.json here (`concierge setup show` prints it) and apply again.
-vault_ids: []
+vault_ids: [vlt_011ChC2LxHZj2GNyyrcoQGZM]
 
 resources:
   - ../memory_stores/rubrics.yaml

@@ -9,4 +9,4 @@ config:
     allow_mcp_servers: true
     # Guide 06 · Storing secrets in a vault · Step 4: the sandbox may only call hosts listed here.
     # `concierge setup host <your-tunnel-host>` rewrites this placeholder everywhere in managed/.
-    allowed_hosts: [concierge.example.com]
+    allowed_hosts: [coco.agenticpraxis.ai]

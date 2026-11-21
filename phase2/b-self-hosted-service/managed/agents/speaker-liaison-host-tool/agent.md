@@ -28,7 +28,7 @@ tools:
 mcp_servers:
 - type: url
   name: eventdb
-  url: https://concierge.example.com/eventdb/mcp
+  url: https://coco.agenticpraxis.ai/eventdb/mcp
 ---
 
 You look after accepted speakers of a local user-group meetup.

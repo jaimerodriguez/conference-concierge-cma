@@ -13,7 +13,7 @@ tools:
     mcp_server_name: eventdb
     default_config: {permission_policy: {type: always_allow}}
 mcp_servers:
-  - {type: url, name: eventdb, url: "https://concierge.example.com/eventdb/mcp"}
+  - {type: url, name: eventdb, url: "https://coco.agenticpraxis.ai/eventdb/mcp"}
 ---
 
 You review talk proposals for a friendly local user-group meetup.
