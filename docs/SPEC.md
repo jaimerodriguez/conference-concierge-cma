@@ -35,9 +35,10 @@ The "AI Meetup" runs a monthly event. Before each event:
 2. **Every morning, the Program Chair reviews new proposals.** A scheduled run fans out the
    new proposals to CFP Reviewers, who score each against the base rubric plus its track
    rubric. The chair writes a digest.
-3. **The organizer accepts talks and the chair builds the agenda.** The chair delegates slot
-   planning to the Scheduler, consults its advisor about topic and speaker balance, and
-   pauses for the organizer's approval before booking calendar slots.
+3. **The organizer accepts talks and the chair builds the agenda.** The chair checks that the
+   talks fit in the evening (accepting only those that do), consults its advisor about topic
+   and speaker balance before anything is booked, then delegates slot planning to the
+   Scheduler, which pauses for the organizer's approval before booking calendar slots.
 4. **Accepted speakers get a perk.** The Speaker Liaison issues each accepted speaker a
    "CloudCredits" sponsor code through an API whose key lives in a vault.
 5. **Attendees ask questions.** The Attendee Helper answers "Where do I park?" or "Is there
@@ -185,7 +186,7 @@ read-only), which also blocks memory poisoning from the public.
 | 3 | System-level memory | Three workspace-scoped stores (§4.3) |
 | 4 | OpenTelemetry | SDK tracing in the CLI and portal to Jaeger; API tracing destination (guide only, needs an org admin) |
 | 5 | Scheduling | Deployment `daily-review`, 08:00 local, plus `deployments.run` to fire it on stage |
-| 6a | Multi-agent: advisor | Program Chair consults Opus 5.5 before publishing the agenda |
+| 6a | Multi-agent: advisor | Program Chair consults Opus 5.5 before the agenda is booked |
 | 6b | Multi-agent: workflow | Program Chair starts a dynamic workflow run that reviews N proposals in parallel with CFP Reviewers; plus the fixed roster for delegation |
 | 7 | MCP with OAuth from the client | `concierge auth calendar` runs the OAuth sign-in and stores tokens in the vault |
 
@@ -226,10 +227,12 @@ CFP Reviewers → reviewers write scores (Event DB MCP) → chair writes `digest
 outcome rubric → organizer reads the digest.
 
 **Build the agenda (roster + advisor + approval).**
-Organizer: "Accept the top 6 and build the agenda" → chair delegates slot planning to the
-Scheduler → consults advisor on balance → Scheduler proposes calendar events → each
-`create_event` pauses for approval in the CLI → Speaker Liaison issues perk codes (vault env var;
-each call pauses for approval too).
+Organizer: "Accept the top 6 and build the agenda" → chair checks the fit with the Event DB
+`check_agenda_fit` tool (everything already accepted, plus breaks and the end buffer) and
+accepts only what fits → consults advisor on balance and running order → delegates slot
+planning to the Scheduler → Scheduler proposes calendar events → each `create_event` pauses
+for approval in the CLI → Speaker Liaison issues perk codes (vault env var; each call pauses
+for approval too, and a declined code skips only that speaker).
 
 **Write a speaker bio (runtime-created agent).** `concierge bio "<name>" "<facts>"` → the Bio
 Writer, created once at runtime with `agents.create`, writes a short bio. This is a separate

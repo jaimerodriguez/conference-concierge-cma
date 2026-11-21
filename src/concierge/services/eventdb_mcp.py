@@ -10,6 +10,7 @@ from typing import Any, Literal
 
 from mcp.server.mcpserver import MCPServer
 
+from concierge.agenda import check_fit
 from concierge.catalog import Catalog
 from concierge.services.store import Store
 
@@ -36,6 +37,23 @@ def build_eventdb_server(store: Store, catalog: Catalog) -> MCPServer:
     ) -> list[dict[str, Any]]:
         """List proposals (id, title, track, status, speaker, score), optionally filtered."""
         return store.list_proposals(status=status, track=track)
+
+    @server.tool()
+    def check_agenda_fit(add_proposal_ids: list[str] | None = None) -> dict[str, Any]:
+        """Check whether proposals fit in the evening before accepting or booking them.
+
+        Counts every proposal already accepted (booked or not) against the talk time left
+        after breaks and the end buffer. Pass the proposals you want to add, in the order you
+        would pick them; each is listed under 'fits' or 'does_not_fit'. With no ids, it checks
+        only what is already accepted."""
+        accepted = store.list_proposals(status="accepted")
+        candidates = []
+        for proposal_id in add_proposal_ids or []:
+            proposal = store.get_proposal(proposal_id)
+            if proposal is None:
+                raise ValueError(f"Unknown proposal {proposal_id}")
+            candidates.append(proposal)
+        return check_fit(catalog.event, accepted, candidates)
 
     @server.tool()
     def get_proposal(proposal_id: str) -> dict[str, Any]:

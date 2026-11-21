@@ -5,6 +5,74 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2026-11-21
+
+#### Added
+- Event DB `check_agenda_fit` tool (`src/concierge/agenda.py`): counts every accepted
+  proposal against the evening's talk time after breaks (one per full hour after the first)
+  and the end buffer, and says which extra proposals fit, taken in the order given. The
+  arithmetic is code, not prompt, so the chair and the Scheduler read the same numbers.
+  `content/event.yaml` gains `slots.buffer_minutes` (default 10). Live output shows it as
+  "checking whether 4 more proposals fit in the evening".
+
+- `review run` shows the delegation inside a workflow run: the run's plan and phase, a line
+  as each CFP Reviewer starts (numbered, with how many run at once) and a line as each
+  finishes, with the score and recommendation it saved. The chair's reads after the run are
+  labelled as reading the reviews the reviewers saved. A run thread's tool calls are not on
+  the session stream, so `follow_session` lists each run thread's own events when it ends
+  and passes them on as a `ThreadFinished` report. `--verbose` adds each reviewer's tool
+  calls.
+- Guide 08: Step 6 (seeing inside a workflow run), sample output with how to read it, and
+  what to look for in the Console session viewer (thread lanes, Threads tab, a reviewer's
+  transcript). `docs/CLI.md` regenerated.
+
+- `agenda build` shows the advisor consultation in two lines: "[Program Chair] consulting
+  its advisor ..." when the platform starts the advisor's thread, and "[Advisor] advised the
+  Program Chair (Opus 5.5, 20 s, $0.10) ..." when it ends, with the model, duration and cost
+  read from the advisor thread's record (`sessions.threads.retrieve`), since the advice
+  itself arrives redacted. `--verbose` adds the tokens the advisor read and wrote. The new
+  `AdviceGiven` report is made in `follow_session` (marker `Guide 09 · Step 3`).
+- Guide 09: Step 3 (seeing the consultation), how a consultation works, sample output with
+  how to read it, what to look for in the Console, and a note that the prompt's "when"
+  decides whether the advice can still change the bookings. `docs/CLI.md` regenerated.
+
+#### Fixed
+- `--verbose` raw tool names such as `[eventdb.list_proposals]` were swallowed by Rich as
+  markup and never printed; progress lines are now escaped.
+- `agenda build`: a reply to the Program Chair now shows the chair's answer. Before, the CLI
+  read the session history after sending the reply, took the idle event that ended the
+  previous turn as the end of the new one, and returned at once, so each reply was sent and
+  answered but the answer was never shown and the prompt repeated.
+
+#### Changed
+- Program Chair: consults its advisor before it asks the Scheduler to book, on the proposed
+  acceptances and running order, instead of after the bookings, so the advice can change the
+  plan. Guide 09 (intro, how a consultation works, sample output from a live run, what to
+  notice), SPEC and the phase 2b rewrite in `make_managed.py` match.
+- Program Chair: before accepting, calls `check_agenda_fit` with the proposals it means to
+  accept; accepts only those that fit and names the rest for the organizer. An earlier run
+  accepted four on top of eight already accepted: 160 minutes of talks in a 150-minute
+  window, ending 21:20. The Scheduler checks again before booking and books nothing if the
+  accepted proposals already overrun, unless the organizer has accepted the overrun.
+- Speaker Liaison: a declined perk code skips only that speaker; it carries on with the rest
+  and lists who was skipped and why. The chair treats a declined booking or code the same
+  way. Approval for each code is unchanged.
+- `agenda build`: declining without a reason now tells the agent that only this one call was
+  declined and to carry on (`DECLINED_WITHOUT_REASON`), instead of a bare "The organizer
+  declined this call." Guide 12 matches.
+- `agenda build`: the line "[Advisor] advised the Program Chair (the advice is private)" is
+  replaced by the two lines above; the redacted advice event alone prints only under
+  `--verbose`.
+- `agenda build`: the reply prompt says the run is complete, that a reply is optional, and
+  what it is for. Guide 12 matches.
+- `concierge serve` logs OAuth use without token values, each line under a bold
+  `========== OAUTH ==========` marker: `SIGN-IN` (tokens issued), `MCP CALL` (each Calendar
+  MCP tool call made with the organizer's access token), `REFRESH` (made by Anthropic for the
+  vault) and `REFUSED`.
+- Guide 07: *Try it* has a "What to look for in the `concierge serve` log" section with the
+  marker, how to grep for it, a table of the three kinds of line and sample lines; *What to
+  notice* explains what those lines prove.
+
 ### 2026-11-20
 
 #### Changed

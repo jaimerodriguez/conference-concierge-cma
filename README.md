@@ -1,7 +1,7 @@
 # Conference Concierge
 
 A small, friendly demo of **Claude Managed Agents**. 
-I created it for a 15 presentation at a Claude user group in San Diego. 
+I created it for a 15-minute presentation at a Claude user group in San Diego. 
 
 Conference Concierge consists of a team of agents that helps run a
 user-group meetup. Members propose talks from their phones, agents review them every

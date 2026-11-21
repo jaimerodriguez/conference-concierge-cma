@@ -10,3 +10,6 @@ slots:
   talk_minutes: 25
   lightning_minutes: 5
   break_minutes: 10
+  # Kept free before talks_end, because talks run over. The Event DB check_agenda_fit tool
+  # subtracts it, with one break per full hour after the first, before counting talk time.
+  buffer_minutes: 10

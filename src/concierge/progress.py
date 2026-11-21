@@ -13,6 +13,9 @@ from pathlib import PurePath
 from typing import Any
 
 from rich.console import Console
+from rich.markup import escape
+
+from concierge.sessions import ADVISOR_AGENT
 
 _FILE_TOOLS = {"bash", "read", "write", "edit", "glob", "grep", "web_fetch", "web_search"}
 _LEAD_IN = re.compile(
@@ -80,6 +83,33 @@ def pretty_name(name: str) -> str:
     return " ".join("CFP" if word.lower() == "cfp" else word.capitalize() for word in words)
 
 
+def pretty_model(model: str) -> str:
+    """ "claude-opus-5-5" -> "Opus 5.5"; a dated suffix such as -20250929 is dropped."""
+    parts = [
+        p for p in model.removeprefix("claude-").split("-") if not (p.isdigit() and len(p) == 8)
+    ]
+    words = [p.capitalize() for p in parts if not p.isdigit()]
+    version = ".".join(p for p in parts if p.isdigit())
+    return " ".join([*words, version]) if version else " ".join(words) or model
+
+
+def describe_advice(report: Any, lead: str, verbose: bool = False) -> str:
+    """One line for a finished advisor consultation, from the advisor thread's record."""
+    facts = [
+        pretty_model(report.model) if report.model else None,
+        f"{round(report.seconds)} s" if report.seconds is not None else None,
+        f"${report.cost_cents / 100:.2f}" if report.cost_cents is not None else None,
+    ]
+    known = ", ".join(f for f in facts if f)
+    line = f"advised the {lead}" + (f" ({known})" if known else "")
+    if verbose and report.input_tokens is not None and report.output_tokens is not None:
+        line += (
+            f"; read {report.input_tokens:,} tokens of the {lead}'s conversation and wrote "
+            f"{report.output_tokens:,} tokens of advice"
+        )
+    return line + f". The advice goes only to the {lead}; this client gets it encrypted."
+
+
 def describe_tool(server: str | None, name: str, tool_input: dict[str, Any]) -> str | None:
     """Plain-language line for a tool call, or None for the generic file/shell tools."""
     get = tool_input.get
@@ -110,6 +140,13 @@ def describe_tool(server: str | None, name: str, tool_input: dict[str, Any]) -> 
                 return f"recording a perk code for {get('member_id', 'a speaker')}"
             case "get_event":
                 return "reading the event details"
+            case "check_agenda_fit":
+                ids = get("add_proposal_ids") or []
+                if not ids:
+                    return "checking that the accepted proposals fit in the evening"
+                count = len(ids)
+                proposals = "1 more proposal fits" if count == 1 else f"{count} more proposals fit"
+                return f"checking whether {proposals} in the evening"
     if server == "calendar":
         match name:
             case "list_events":
@@ -203,6 +240,14 @@ class Progress:
         self.max_rounds = max_rounds
         self._threads: dict[str, str] = {}
         self._last: tuple[str, str] | None = None
+        # Workflow runs (Guide 08): who is in each run, who is working right now, and which
+        # reviewer saved the review of which proposal.
+        self._phases: dict[str, str] = {}  # phase id -> name
+        self._run_size: dict[str, int] = {}  # run id -> threads started so far
+        self._run_threads: set[str] = set()
+        self._working: set[str] = set()
+        self._reviewed_by: dict[str, str] = {}  # proposal id -> reviewer label
+        self._runs_ended = False
 
     # -- helpers -----------------------------------------------------------------
 
@@ -214,7 +259,7 @@ class Progress:
         if self._last == (who, text):
             return  # the same step repeated (many file tools in a row)
         self._last = (who, text)
-        self.console.print(f"[{style}]\\[{who}][/{style}] {text}")
+        self.console.print(f"[{style}]\\[{escape(who)}][/{style}] {escape(text)}")
 
     def _round(self, iteration: int) -> str:
         total = f" of {self.max_rounds}" if self.max_rounds else ""
@@ -228,10 +273,44 @@ class Progress:
                 # Learn names here too: after a re-attach the thread_created events are old.
                 if getattr(event, "agent_name", None) and event.session_thread_id:
                     self._threads.setdefault(event.session_thread_id, pretty_name(event.agent_name))
+                if (
+                    event.type == "session.thread_status_running"
+                    and event.session_thread_id in self._run_threads
+                    and event.session_thread_id not in self._working
+                ):
+                    self._working.add(event.session_thread_id)
+                    count = len(self._working)
+                    self._say(
+                        self._who(event),
+                        "started" + (f" ({count} running at once)" if count > 1 else ""),
+                        "cyan",
+                    )
+            case "session.thread_created" if getattr(event, "agent_name", None) == ADVISOR_AGENT:
+                # Guide 09: the platform starts an advisor thread for each consultation.
+                self._threads[event.session_thread_id] = "Advisor"
+                self._say(
+                    self.lead,
+                    "consulting its advisor, which reads the whole conversation so far "
+                    "and replies with advice",
+                    "cyan",
+                )
+            case "concierge.advice_given":
+                self._say("Advisor", describe_advice(event, self.lead, self.verbose), "cyan")
+            case "session.thread_created" if getattr(event, "workflow_run_id", None):
+                # A run's threads all run the same agent, so number them: CFP Reviewer 1, 2...
+                run = event.workflow_run_id
+                self._run_size[run] = self._run_size.get(run, 0) + 1
+                label = f"{pretty_name(event.agent_name)} {self._run_size[run]}"
+                self._threads[event.session_thread_id] = label
+                self._run_threads.add(event.session_thread_id)
+                if self.verbose:
+                    self._say("Workflow run", f"bringing in {label}", "magenta")
             case "session.thread_created":
                 self._threads[event.session_thread_id] = pretty_name(event.agent_name)
                 if self.verbose:
                     self._say(self.lead, f"bringing in {pretty_name(event.agent_name)}", "cyan")
+            case "concierge.thread_finished":
+                self._thread_finished(event)
             case "agent.thread_message_sent":
                 target = pretty_name(event.to_agent_name) if event.to_agent_name else "a teammate"
                 text = next((b.text for b in event.content if b.type == "text"), "")
@@ -244,16 +323,39 @@ class Progress:
                 text = next((b.text for b in event.content if b.type == "text"), "")
                 if text.strip():
                     self._say(who, f"reported back: {first_sentence(text, 90)}", style="cyan")
-                else:  # the advisor's reply is redacted: only the agent it advised can read it
-                    self._say(who, "advised the Program Chair (the advice is private)", "cyan")
+                elif self.verbose:  # the advice is redacted; concierge.advice_given says more
+                    self._say(who, "advice delivered [agent.thread_message_received, redacted]")
             case "workflow_run.created":
-                self._say(self.lead, f"starting a workflow run ({event.name})", style="magenta")
+                for phase in getattr(event, "phases", None) or []:
+                    self._phases[phase.id] = phase.name
+                plan = getattr(event, "description", None)
+                self._say(
+                    self.lead,
+                    f"starting a workflow run ({event.name})"
+                    + (f": {first_sentence(plan, 100)}" if plan else ""),
+                    style="magenta",
+                )
+            case "workflow_run.phase_started":
+                name = self._phases.get(event.workflow_run_phase_id, "unnamed")
+                self._say("Workflow run", f"phase started: {name}", "magenta")
+            case "workflow_run.phase_ended" if self.verbose:
+                name = self._phases.get(event.workflow_run_phase_id, "unnamed")
+                self._say("Workflow run", f"phase ended: {name}", "magenta")
+            case "workflow_run.error":
+                self._say("Workflow run", f"error: {event.error.message}", "red")
             case "workflow_run.status_ended":
-                self._say(self.lead, f"the workflow run ended: {event.result.type}", "magenta")
+                self._runs_ended = True
+                count = self._run_size.get(event.workflow_run_id, 0)
+                threads = f" ({count} agent thread{'' if count == 1 else 's'})" if count else ""
+                self._say(
+                    self.lead, f"the workflow run ended: {event.result.type}{threads}", "magenta"
+                )
             case "agent.mcp_tool_use" if _waits_for_person(event) and not self.verbose:
                 pass  # the approval question says the same thing, so one line, not two
             case "agent.mcp_tool_use":
-                text = describe_tool(event.mcp_server_name, event.name, event.input)
+                text = self._reading_results(event) or describe_tool(
+                    event.mcp_server_name, event.name, event.input
+                )
                 text = text or f"using {event.mcp_server_name}.{event.name}"
                 if self.verbose:
                     text += f" [{event.mcp_server_name}.{event.name}]"
@@ -275,6 +377,49 @@ class Progress:
                 )
             case "session.error":
                 self.console.print(f"[red]Problem reported:[/red] {event.error.message}")
+
+    # -- workflow runs -----------------------------------------------------------
+
+    def _thread_finished(self, report: Any) -> None:
+        """One line for a run thread that ended: what it saved, read from its own events."""
+        who = self._threads.get(report.session_thread_id, pretty_name(report.agent_name))
+        self._working.discard(report.session_thread_id)
+        tool_calls = [e for e in report.events if e.type == "agent.mcp_tool_use"]
+        if self.verbose:  # the thread's own tool calls, which the session stream never shows
+            for call in report.events:
+                if call.type == "agent.mcp_tool_use":
+                    line = describe_tool(call.mcp_server_name, call.name, call.input)
+                    self._say(who, f"{line} [{call.mcp_server_name}.{call.name}]")
+                elif call.type == "agent.tool_use":
+                    self._say(who, f"tool {call.name}")
+        saved = [c for c in tool_calls if c.name == "record_review"]
+        if saved:
+            done = "; ".join(
+                (describe_tool("eventdb", c.name, c.input) or "").replace("saving", "saved", 1)
+                for c in saved
+            )
+            for call in saved:
+                if call.input.get("proposal_id"):
+                    self._reviewed_by[call.input["proposal_id"]] = who
+        else:
+            read = [c.input.get("proposal_id") for c in tool_calls if c.name == "get_proposal"]
+            done = f"read {', '.join(p for p in read if p)} but saved no review" if read else ""
+        for problem in (e for e in report.events if e.type == "session.error"):
+            self._say(who, f"problem: {problem.error.message}", "red")
+        left = len(self._working)
+        status = f"{left} still running" if left else "the last one to finish"
+        self._say(who, f"finished, {done}; {status}" if done else f"finished; {status}", "cyan")
+
+    def _reading_results(self, event: Any) -> str | None:
+        """Name the coordinator's reads after a run for what they are: collecting results."""
+        if self._who(event) != self.lead or event.mcp_server_name != "eventdb":
+            return None
+        proposal = event.input.get("proposal_id")
+        if event.name == "get_proposal" and proposal in self._reviewed_by:
+            return f"reading the review {self._reviewed_by[proposal]} saved for {proposal}"
+        if event.name == "list_proposals" and self._runs_ended:
+            return f"{describe_tool('eventdb', event.name, event.input)} to collect the results"
+        return None
 
 
 def _waits_for_person(event: Any) -> bool:

@@ -223,6 +223,14 @@ def test_proposal_review_acceptance_and_perk(client: TestClient, settings: Setti
     )
     assert "speaker" in store.get_member(member["id"])["roles"]
 
+    # The accepted lightning talk now counts against the evening's talk time.
+    fit = call_tool(client, "eventdb", token, "check_agenda_fit", {})
+    assert fit["result"]["structuredContent"]["accepted_minutes"] == 5
+    unknown = call_tool(
+        client, "eventdb", token, "check_agenda_fit", {"add_proposal_ids": ["prop_nope"]}
+    )
+    assert unknown["result"]["isError"] is True
+
     assert client.post("/credits/api/codes", json=perk_request).status_code == 401
     first = client.post("/credits/api/codes", json=perk_request, headers=key).json()
     second = client.post("/credits/api/codes", json=perk_request, headers=key).json()
@@ -410,3 +418,41 @@ def test_a_rejected_proposal_returns_to_a_filled_in_form(
     assert typed["abstract"] in page
     assert 'value="community" selected' in page and 'value="data-engineer" selected' in page
     assert 'name="ai_abstract" id="ai_abstract" value="on">' in page  # still unchecked
+
+
+def test_oauth_use_is_logged_without_any_token(
+    client: TestClient, settings: Settings, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Guide 07 tells students to look for these lines in the `concierge serve` output.
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
+        tokens = sign_in(client, settings)
+        call_tool(
+            client,
+            "calendar",
+            tokens["access_token"],
+            "create_event",
+            {
+                "title": "Opening talk",
+                "room": "Main Hall",
+                "starts_at": "2026-12-10T18:30",
+                "ends_at": "2026-12-10T18:55",
+            },
+        )
+        renewed = client.post(
+            "/oauth/token",
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": tokens["refresh_token"],
+                "client_id": OAUTH_CLIENT_ID,
+            },
+        ).json()
+    assert "========== OAUTH ========== SIGN-IN: issued tokens for organizer" in caplog.text
+    assert (
+        "========== OAUTH ========== MCP CALL: Calendar MCP create_event authorized by the "
+        "OAuth access token for organizer: booking 'Opening talk' in Main Hall at "
+        "2026-12-10T18:30"
+    ) in caplog.text
+    assert "========== OAUTH ========== REFRESH: new access token for organizer" in caplog.text
+    for secret in (*tokens.values(), renewed["access_token"], renewed["refresh_token"]):
+        if len(str(secret)) > 20:
+            assert str(secret) not in caplog.text

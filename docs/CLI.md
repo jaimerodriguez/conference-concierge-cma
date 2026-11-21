@@ -173,7 +173,7 @@ uv run concierge auth calendar [OPTIONS]
 
 ## `concierge review run`
 
-Run the daily proposal review now and follow it.
+Run the daily proposal review now and follow it, reviewer by reviewer.
 
 ```sh
 uv run concierge review run [OPTIONS]
@@ -183,7 +183,7 @@ uv run concierge review run [OPTIONS]
 | --- | --- | --- |
 | `--direct / --no-direct` | off | Start an ordinary session instead of firing the deployment. |
 | `--force / --no-force` | off | Start the review even when no proposal is waiting. |
-| `--verbose` | off | Also show the raw tool names in the live output. |
+| `--verbose` | off | Also show each reviewer's own tool calls and the raw tool names. |
 
 ## `concierge review runs`
 
@@ -209,7 +209,7 @@ uv run concierge agenda build [INSTRUCTION] [OPTIONS]
 | --- | --- | --- |
 | `INSTRUCTION (optional)` | none | What to ask the Program Chair. Default: accept the top four, breaking ties for variety, then book. With --session: your reply, or leave it out to re-attach and answer what is waiting. |
 | `--session` | none | Continue this agenda session (sesn_...): answer any booking still waiting for approval, then follow it. |
-| `--verbose` | off | Also show the raw tool names in the live output. |
+| `--verbose` | off | Also show the advisor's token counts and the raw tool names. |
 
 ## `concierge data clear`
 

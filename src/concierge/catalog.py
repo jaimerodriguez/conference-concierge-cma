@@ -30,6 +30,8 @@ class Slots(BaseModel):
     talk_minutes: int
     lightning_minutes: int
     break_minutes: int
+    # Kept free before the end of the evening, because talks run over (see ops-notes).
+    buffer_minutes: int = 10
 
 
 class Event(BaseModel):

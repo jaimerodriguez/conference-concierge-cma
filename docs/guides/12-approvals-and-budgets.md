@@ -35,7 +35,9 @@ Find it: `src/concierge/sessions.py`, marker `Step 4`.
 **Step 5. Put the decision in front of a person.** The CLI asks one plain question per
 call, such as "Book 'Break' in Main Hall, 19:20-19:30?". Answer `y`, `n` (it then asks why,
 and the agent reads your reason), or `a` to approve this and every remaining booking in the
-run. `--verbose` also shows the tool name and its raw input. Where nobody is watching, the
+run. If you press Enter instead of giving a reason, the agent is told that you declined this
+one call and should carry on with the rest (`DECLINED_WITHOUT_REASON`). A bare "declined"
+once made the Speaker Liaison stop issuing codes to every other speaker. `--verbose` also shows the tool name and its raw input. Where nobody is watching, the
 default approver denies everything.
 Find it: `src/concierge/cli.py`, marker `Step 5`.
 
@@ -43,17 +45,21 @@ Perk codes work the same way. Issuing one spends sponsor money, so the Speaker L
 `bash` tool is set to `always_ask` (`managed/agents/speaker-liaison/agent.md`), and it makes
 one request per code. Each call arrives as "Issue a CloudCredits perk code ($50) for Priya
 (mem_...)?". Here `a` approves the remaining perk codes only, never other shell commands.
+Declining one code skips only that speaker: the liaison's prompt tells it to go on to the
+next speaker and list who was skipped, with your reason.
 
 ## Try it
 ```sh
 uv run concierge agenda build
 ```
 Decline one booking and give a reason, such as "not before 6:30 PM". The Scheduler reads
-your reason and proposes another slot.
+your reason and proposes another slot. Decline one perk code without a reason: the Speaker
+Liaison skips that speaker, issues the rest, and names the skipped speaker in its report.
 
 While the agents work, each step is one line. When the Program Chair ends its turn, its
-last message is shown in full, then the CLI asks for your reply. Type one to carry on in
-the same session, or press Enter to finish. The default instruction tells the chair how to
+last message is shown in full and the CLI says the run is complete. A reply is optional:
+type one to answer a question or ask for a change, and the chair answers in the same
+session; press Enter to finish. The default instruction tells the chair how to
 break ties (variety of tracks and speakers), so it should not stop to ask. If it does stop,
 and you finished without answering, reply later in that session:
 ```sh

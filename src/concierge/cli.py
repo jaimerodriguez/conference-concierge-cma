@@ -171,10 +171,17 @@ class _AskPerson:
         reason = typer.prompt(
             "  Why not? The agent reads this (Enter to skip)", default="", show_default=False
         )
-        return Decision(allow=False, message=reason or "The organizer declined this call.")
+        return Decision(allow=False, message=reason or DECLINED_WITHOUT_REASON)
 
 
 _ask_person = _AskPerson()
+
+# Sent when the organizer declines without typing a reason. A bare "declined" once made the
+# Speaker Liaison stop every remaining perk code, so say what the decline covers.
+DECLINED_WITHOUT_REASON = (
+    "The organizer declined this one call and gave no reason. Do not retry it. Carry on with "
+    "the rest of your task, and report this call as declined."
+)
 
 
 def _member_email(member_id: str) -> str | None:
@@ -744,9 +751,19 @@ def review_run(
     force: Annotated[
         bool, typer.Option(help="Start the review even when no proposal is waiting.")
     ] = False,
-    verbose: VERBOSE = False,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            help="Also show each reviewer's own tool calls and the raw tool names.",
+        ),
+    ] = False,
 ) -> None:
-    """Run the daily proposal review now and follow it."""
+    """Run the daily proposal review now and follow it, reviewer by reviewer.
+
+    In a workflow run, each CFP Reviewer gets a line when it starts (with how many run at
+    once) and when it finishes (with the score and recommendation it saved).
+    """
     from concierge.review import (
         DIGEST_FILE,
         review_budget_cents,
@@ -831,7 +848,13 @@ def agenda_build(
             "for approval, then follow it."
         ),
     ] = None,
-    verbose: VERBOSE = False,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            help="Also show the advisor's token counts and the raw tool names.",
+        ),
+    ] = False,
 ) -> None:
     """Ask the Program Chair to build the agenda. You approve each calendar booking.
 
@@ -883,9 +906,13 @@ def agenda_build(
             break
         # The chair may end its turn on a question (a tie, a missing detail). Answer it here
         # and it carries on in the same session, with everything it already knows.
-        reply = typer.prompt(
-            "\nReply to the Program Chair, or press Enter to finish", default="", show_default=False
-        ).strip()
+        console.print(
+            "\n[bold]This run is complete.[/bold] Every booking you approved is already made. "
+            "A reply is optional: type one to answer a question the chair asked or to ask for "
+            "a change, and it carries on in the same session with everything it already "
+            "knows. Press Enter to finish."
+        )
+        reply = typer.prompt("Your reply (optional)", default="", show_default=False).strip()
         if not reply:
             break
         instruction = reply

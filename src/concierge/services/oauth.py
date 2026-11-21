@@ -23,6 +23,7 @@ from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Re
 from starlette.routing import Route
 
 from concierge.config import Settings
+from concierge.services.auth import log_oauth
 from concierge.services.store import Store
 
 CLIENT_ID = "concierge-cli"
@@ -160,6 +161,12 @@ def build_routes(settings: Settings, store: Store) -> list[Route]:
             verifier = str(form.get("code_verifier", ""))
             if not secrets.compare_digest(_pkce_challenge(verifier), grant["code_challenge"]):
                 return _oauth_error("invalid_grant", "PKCE verification failed")
+            # The log names the grant and the subject, never a token, code or password.
+            log_oauth(
+                "SIGN-IN",
+                f"issued tokens for {grant['subject']} (authorization_code grant). The access "
+                f"token expires in {ACCESS_TOKEN_TTL_SECONDS // 60} min.",
+            )
             return issue_tokens(grant["scope"], grant["subject"])
 
         if grant_type == "refresh_token":
@@ -167,8 +174,16 @@ def build_routes(settings: Settings, store: Store) -> list[Route]:
             presented = str(form.get("refresh_token", ""))
             grant = store.get_oauth_token(presented, "refresh")
             if grant is None:
+                log_oauth(
+                    "REFUSED", "refresh_token grant with an unknown or used token", warning=True
+                )
                 return _oauth_error("invalid_grant", "refresh token is invalid")
             store.delete_oauth_token(presented)  # rotation: each refresh token works once
+            log_oauth(
+                "REFRESH",
+                f"new access token for {grant['subject']} (refresh_token grant, made by "
+                "Anthropic for the vault, not by you). The old refresh token is retired.",
+            )
             return issue_tokens(grant["scope"], grant["subject"])
 
         return _oauth_error("unsupported_grant_type", f"unsupported grant_type {grant_type!r}")

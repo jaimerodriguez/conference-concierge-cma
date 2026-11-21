@@ -11,7 +11,7 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from concierge.services.auth import current_subject
+from concierge.services.auth import current_subject, log_oauth, logger
 from concierge.services.store import Store
 
 
@@ -24,6 +24,20 @@ def _parse(value: str) -> datetime:
         ) from error
 
 
+def _log_call(tool: str, detail: str = "") -> str:
+    """Log one tool call and the credential it came with. Never logs the token itself."""
+    subject = current_subject.get("unknown")
+    if "static token" in subject:  # phase 2b only: no OAuth involved
+        logger.info("Calendar MCP: %s call authorized by a static token%s", tool, detail)
+    else:
+        # Guide 07 (Step 6, server side): this line shows the vaulted OAuth token reached us.
+        log_oauth(
+            "MCP CALL",
+            f"Calendar MCP {tool} authorized by the OAuth access token for {subject}{detail}",
+        )
+    return subject
+
+
 def build_calendar_server(store: Store) -> MCPServer:
     server = MCPServer(
         name="calendar",
@@ -33,6 +47,7 @@ def build_calendar_server(store: Store) -> MCPServer:
     @server.tool()
     def list_events(date: str | None = None) -> list[dict[str, Any]]:
         """List booked events, optionally for one date (YYYY-MM-DD)."""
+        _log_call("list_events")
         return store.list_calendar_events(date=date)
 
     @server.tool()
@@ -41,6 +56,7 @@ def build_calendar_server(store: Store) -> MCPServer:
     ) -> list[dict[str, str]]:
         """Find free slots of a given length in a room. `window_start` and `window_end` are
         local times (HH:MM) on `date` (YYYY-MM-DD)."""
+        _log_call("find_free_slots")
         cursor = _parse(f"{date}T{window_start}")
         end = _parse(f"{date}T{window_end}")
         booked = [
@@ -67,13 +83,14 @@ def build_calendar_server(store: Store) -> MCPServer:
     @server.tool()
     def create_event(title: str, room: str, starts_at: str, ends_at: str) -> dict[str, Any]:
         """Book a slot on the organizer's calendar. Fails if the room is already booked."""
+        subject = _log_call("create_event", f": booking {title!r} in {room} at {starts_at}")
         return store.add_calendar_event(
             title=title,
             room=room,
             starts_at=_parse(starts_at).isoformat(timespec="minutes"),
             ends_at=_parse(ends_at).isoformat(timespec="minutes"),
             # Set by the bearer middleware from the OAuth token: the booking is the organizer's.
-            created_by=current_subject.get("unknown"),
+            created_by=subject,
         )
 
     return server
