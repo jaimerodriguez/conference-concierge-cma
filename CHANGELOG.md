@@ -15,6 +15,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the title-based `propose` command.
 - Guide 05: a *Content mode* section (what `metadata_only` and `content` show in Jaeger,
   where to change it, and the privacy caution) and a *Try it* step for switching to `content`.
+- Guide 06 (vault): *What to notice* rewritten to explain the `cma_ph_` placeholder, where the
+  proxy swaps it (`allowed_hosts`, `injection_location`), why it only works in Anthropic's
+  cloud sandbox, and how to remove stale credentials with `setup vault --remove-stale`.
+- Guide 04: notes that `ant beta:memory-stores list` browses the memory store.
+- Guide 05: clarifies the `propose` example in *Try it*.
+- README: says what the demo was built for, adds an AI-generated disclaimer with links to
+  report issues or open a PR, and retitles the flow section.
+- Abstract rubric: the abstract must describe an educational user-group session related to
+  the title.
+- Managed resources: the placeholder host `concierge.example.com` is replaced with the
+  demo's tunnel host (`setup host`), and `daily-review.yaml` lists the demo vault ID.
 
 #### Fixed
 - A Managed Agents session's title now keeps up to 120 characters of the talk title

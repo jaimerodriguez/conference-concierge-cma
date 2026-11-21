@@ -1,12 +1,15 @@
 # Conference Concierge
 
-A small, friendly demo of **Claude Managed Agents**: a team of agents that helps run a
+A small, friendly demo of **Claude Managed Agents**. 
+I created it for a 15 presentation at a Claude user group in San Diego. 
+
+Conference Concierge consists of a team of agents that helps run a
 user-group meetup. Members propose talks from their phones, agents review them every
 morning, an organizer approves the agenda, speakers get a sponsor perk, and attendees ask
 about the venue.
 
-It is built to be read. Every feature has a short [task guide](docs/guides/README.md) that
-points to the exact lines that implement it, and the source carries matching markers:
+This source is built to be read. Major features have a short [task guide](docs/guides/README.md) that
+points to the exact lines that implement it, and the source carries matching markers, like this one: 
 
 ```python
 # Guide 05 · Wiring up OpenTelemetry · Step 2: register the tracer provider.
@@ -14,7 +17,9 @@ points to the exact lines that implement it, and the source carries matching mar
 
 Search the repo for `Guide 05 ·` to see every step of a guide in place.
 
-## How a talk moves through it
+Disclaimer: All the code and guides are AI generated. This is a sample that introduces concepts and features; it is not production code or production prompts.  If you see issues, please [report them](https://github.com/jaimerodriguez/conference-concierge/issues) or [create a PR](https://github.com/jaimerodriguez/conference-concierge/pulls).
+
+## How a talk proposal moves through the concierge's workflows
 
 ![Who does the work, from proposal to agenda](docs/images/flow-who-does-the-work.png)
 

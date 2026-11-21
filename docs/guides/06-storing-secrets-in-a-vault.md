@@ -46,13 +46,32 @@ echo and then each perk code. The echo prints an opaque placeholder, and the API
 succeeds.
 
 ## What to notice
-- A credential stored for an address you no longer use (say, an old tunnel) is **ignored**: a
-  session only uses credentials whose URL matches an agent's MCP server. `concierge doctor`
-  shows it as a `note`, not a `todo`. `setup vault` never deletes it; to remove it, run
-  `uv run concierge setup vault --remove-stale` (it lists them and asks first; deleting is permanent).
-- Substitution happens after the request leaves the sandbox, in headers and body only. A
-  secret in a URL path is never substituted.
-- A service that echoes request headers would hand the secret back to the sandbox. Allow
+- **The sandbox only ever holds a stand-in for the key.** Inside the sandbox,
+  `$CLOUDCREDITS_API_KEY` contains a placeholder (a random string that starts with `cma_ph_`),
+  which is why the echo prints that instead of the key. When `curl` puts the placeholder in a
+  request header, Anthropic's network proxy swaps it for the real key once the request has
+  left the sandbox and is on its way to the CloudCredits API. Nothing inside the sandbox (the
+  agent, its shell, its files) ever sees the real value.
+- **The swap only happens where you allow it.** The proxy replaces the placeholder only on
+  requests to the credential's `allowed_hosts`, and only in the parts of the request that
+  `injection_location` allows. This demo allows headers only (Step 3). A placeholder anywhere
+  else, such as the request body or the URL, is sent unchanged, so the real key is never used there.
+- A service that echoes request headers back would hand the real key to the sandbox. Allow
   only hosts you trust.
-- Secret fields are write-only. Running `setup vault` again rotates them in place.
-- This credential type needs Anthropic-managed egress. Phase 2 shows what replaces it.
+- Secret fields are write-only: the API never returns them. Running `setup vault` again
+  rotates them in place.
+- **This only works in Anthropic's cloud sandbox.** The swap is done by Anthropic's proxy,
+  which sits between the cloud sandbox and the internet. A sandbox you host yourself (Phase 2)
+  reaches the internet through your own network, so no Anthropic proxy is in the path to make
+  the swap, and `setup vault` skips this credential there. Guide 20 replaces it with a custom
+  tool that runs in your own process and holds the key. Guide 21 covers the self-hosted
+  service, which can do the same swap only if you turn on its egress gateway.
+- **Removing old credentials.** If your services move to a new address (say, a new tunnel),
+  the credentials stored for the old MCP server URLs stay in the vault. They do no harm: a
+  session only uses a credential whose URL matches one of the agent's MCP servers, so old ones
+  are never picked. `setup vault` and `concierge doctor` both list these leftovers. To delete them:
+  ```sh
+  uv run concierge setup vault --remove-stale
+  ```
+  It shows what it will delete and asks first, because deleting is permanent (`--yes` skips
+  the question).

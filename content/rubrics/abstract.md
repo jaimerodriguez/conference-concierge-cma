@@ -8,3 +8,4 @@
 - The abstract is written in the first person, in the voice of the persona given in the task.
 - The abstract names at least one concrete thing the audience will learn.
 - The content is respectful: nothing sexual, violent, hateful, or about a real private person.
+- The abstract describes an educational, informative, user group session that relates to the title. 

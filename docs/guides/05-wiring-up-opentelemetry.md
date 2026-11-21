@@ -79,7 +79,7 @@ Find it: `src/concierge/proposals.py`, marker `Step 4`.
 **Step 5. Run a backend.** Jaeger accepts OTLP directly.
 Find it: `docker-compose.yml`, marker `Step 5`.
 
-**Step 6. Optional: add API tracing.** (No marker: no code.)
+**Step 6. Optional:  API tracing.** (No marker: no code.)
 Steps 1 to 5 trace what happens *in your process*. Once a request reaches Anthropic, your
 process only sees how long the call took. For a Managed Agents session that is most of the
 story: the agent's turns, each model request, and the server and MCP tool runs all happen on
@@ -119,7 +119,8 @@ Reference: [OpenTelemetry for the Claude API](https://platform.claude.com/docs/e
 # From the root of the repository, where docker-compose.yml is
 docker compose up -d                              # starts Jaeger
 # In .env, uncomment: OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-uv run concierge propose "Running models locally"  # the argument is the talk's title
+# The line below proposes a new session titled "Running models locally"  
+uv run concierge propose "Running models locally"  
 open http://localhost:16686                       # pick service concierge-cli, then Find Traces
 ```
 Open the `concierge.submit_proposal` trace. You see your own span with moderation and the
