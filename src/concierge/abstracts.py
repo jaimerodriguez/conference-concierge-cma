@@ -18,6 +18,7 @@ from pydantic import BaseModel, ValidationError
 from concierge.catalog import Persona, TalkFormat, Track, get_catalog
 from concierge.config import Settings, get_settings
 from concierge.managed import ManagedResources
+from concierge.moderation import MAX_TITLE_CHARS
 from concierge.sessions import SessionResult, budget, follow_session, read_output_file
 
 OUTPUT_FILE = "abstract.json"
@@ -75,7 +76,7 @@ def write_abstract(
             "system": build_system_prompt(settings, persona, track),
         },
         environment_id=managed.environment_id(),
-        title=f"Abstract: {title[:60]}",
+        title=f"Abstract: {title[:MAX_TITLE_CHARS]}",
         # Guide 12 · Approvals and budgets · Step 2: cap what one audience submission can spend.
         budget=budget(settings.proposal_budget_cents),
         metadata={"persona": persona.id, "track": track.id},

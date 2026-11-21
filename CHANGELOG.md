@@ -17,6 +17,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   where to change it, and the privacy caution) and a *Try it* step for switching to `content`.
 
 #### Fixed
+- A Managed Agents session's title now keeps up to 120 characters of the talk title
+  (`MAX_TITLE_CHARS`, the portal's limit) instead of cutting it at 60.
 - `docs/SPEC.md` and `telemetry.py` no longer mention an OpenTelemetry Collector; the demo
   sends spans straight to Jaeger.
 - `OTEL_EXPORTER_OTLP_ENDPOINT` (and any other `OTEL_*` variable) set in `.env` was ignored,
