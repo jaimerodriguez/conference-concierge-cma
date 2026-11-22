@@ -12,7 +12,7 @@ from concierge.abstracts import build_system_prompt
 from concierge.catalog import load_catalog, rubric_for_track
 from concierge.config import REPO_ROOT, Settings
 from concierge.managed import ManagedResources, NotAppliedError
-from concierge.moderation import MAX_TOPIC_CHARS, moderate_topic
+from concierge.moderation import MAX_TOPIC_CHARS, moderate_topic, suggestion_sentence
 from concierge.review import load_review_kickoff
 from concierge.sessions import budget
 
@@ -51,6 +51,17 @@ def test_moderation_rejects_empty_and_oversized_topics_without_a_model_call() ->
     no_client = None  # these checks must not reach the API
     assert moderate_topic(no_client, "   ").allowed is False  # type: ignore[arg-type]
     assert moderate_topic(no_client, "x" * (MAX_TOPIC_CHARS + 1)).allowed is False  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "suggestion",
+    ["Ocean waves power a laptop", "Ocean waves power a laptop.", " Ocean waves power a laptop?! "],
+)
+def test_a_suggestion_reads_as_a_closed_statement(suggestion: str) -> None:
+    # The CLI and the portal are one-shot: nobody can answer a question.
+    assert suggestion_sentence(suggestion) == (
+        "You could resubmit with a title like: Ocean waves power a laptop."
+    )
 
 
 def test_budget_uses_minor_units_as_a_string() -> None:

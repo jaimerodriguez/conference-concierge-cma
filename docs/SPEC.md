@@ -79,7 +79,7 @@ A rubric is a **shared base plus a per-track add-on**, both markdown files in
 
 | File | Criteria |
 |---|---|
-| `base.md` | Clarity, originality, fits the time slot, audience takeaway, abstract length |
+| `base.md` | Clarity (title and abstract describe the same talk), originality, fits the time slot, audience takeaway, abstract length, respectful |
 | `tracks/ai-ml.md` | Technical depth, demo or evidence, reproducibility |
 | `tracks/community.md` | Inclusiveness, actionable for organizers, story |
 | `tracks/lightning.md` | One idea, fits 5 minutes, memorable hook |
@@ -97,12 +97,14 @@ Each venue is a markdown profile in `content/venues/` (address, parking, transit
 accessibility, food, rooms, AV). An event points at one venue. Two sample venues ship so the
 demo can show switching venues: a tech office and a public library.
 
-### 3.5 Personas and topics
+### 3.5 Personas and sample proposals
 
 `content/personas.yaml` holds the portal's personas ("Weekend hacker", "Data engineer",
-"Community organizer"…). `content/topics.yaml` holds AI topics ("Building AI agents",
-"Model distillation", "Writing agent skills"…) that `concierge data sample` builds sample talks
-around. The portal does not offer topics: the person's title is what the agent writes about.
+"Community organizer"…). `content/sample_proposals.yaml` holds the AI-centered proposals
+`concierge data sample` adds: five solid ones and five problem cases the review should catch
+(a title that does not match its abstract, inappropriate content, a prompt injection, a sales
+pitch, a workshop in a lightning slot), ten at most. The portal does not offer topics: the
+person's title is what the agent writes about.
 
 ---
 
@@ -205,7 +207,8 @@ read-only), which also blocks memory poisoning from the public.
 1. Personas and tracks are picked from lists, so they need no check.
 2. Every typed title goes to the Moderator (Haiku 5.5, structured output: `allowed`, `reason`,
    `suggestion`). Rejects sexual, violent, hateful or harassing content, real private people,
-   and anything not respectful. Rejection shows a friendly "try something else" with a suggestion.
+   and anything not respectful. Rejection shows a friendly "try something else" with a suggestion,
+   phrased as a statement ("You could resubmit with a title like: …"), never a question.
    A title and abstract a person writes themselves go through the same check, with the same
    house rule, before they are saved.
 3. The Abstract Writer's prompt repeats the content rules (defense in depth).
@@ -322,7 +325,7 @@ conference-concierge/
 │   ├── memory_stores/*.yaml
 │   ├── vaults/concierge.yaml
 │   └── deployments/daily-review.yaml
-├── content/                  # venues, rubrics, personas, topics, seed notes
+├── content/                  # venues, rubrics, personas, sample proposals, seed notes
 ├── src/concierge/
 │   ├── cli.py                # `concierge` Typer app
 │   ├── config.py, managed.py # settings; IDs from claude-lock.json

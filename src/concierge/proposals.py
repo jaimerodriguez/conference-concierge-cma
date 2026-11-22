@@ -13,10 +13,11 @@ from typing import Any
 from anthropic import Anthropic
 
 from concierge.abstracts import write_abstract
-from concierge.catalog import get_catalog
+from concierge.catalog import Catalog, get_catalog
 from concierge.config import Settings, get_settings
 from concierge.moderation import (
     FRIENDLY_REJECTION,
+    MAX_ABSTRACT_CHARS,
     MAX_TITLE_CHARS,
     moderate_abstract,
     moderate_topic,
@@ -25,6 +26,7 @@ from concierge.services.store import Store
 from concierge.telemetry import get_tracer
 
 MAX_EMAIL_CHARS = 254  # the longest address SMTP allows
+MIN_ABSTRACT_CHARS = 50
 # Deliberately loose: one @, no spaces, and a dot in the domain. Real validation is sending mail.
 _EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s.]{2,}")
 
@@ -38,6 +40,40 @@ def normalize_email(value: str) -> str | None:
         return None
     local, domain = value.rsplit("@", 1)
     return f"{local}@{domain.lower()}"
+
+
+def check_submission(
+    catalog: Catalog,
+    *,
+    contact_email: str,
+    title: str,
+    track_id: str,
+    persona_id: str,
+    abstract: str | None = None,
+) -> str | None:
+    """The first problem with a submission, in the order the portal form asks, or None.
+
+    These checks are free and need no model call, so the portal and `concierge propose` both
+    run them before ``submit_proposal``. ``abstract`` is None when the Abstract Writer writes it.
+    """
+    title = title.strip()
+    if normalize_email(contact_email) is None:
+        return "Please enter a valid contact email, like sam@example.com."
+    if not title:
+        return "Give your talk a title."
+    if len(title) > MAX_TITLE_CHARS:
+        return f"Please keep the title under {MAX_TITLE_CHARS} characters."
+    if abstract is not None:
+        abstract = abstract.strip()
+        if len(abstract) < MIN_ABSTRACT_CHARS:
+            return f"Please write an abstract of at least {MIN_ABSTRACT_CHARS} characters."
+        if len(abstract) > MAX_ABSTRACT_CHARS:
+            return f"Please keep the abstract under {MAX_ABSTRACT_CHARS} characters."
+    if track_id not in (tracks := [track.id for track in catalog.tracks]):
+        return f"Pick one of the tracks: {', '.join(tracks)}."
+    if persona_id not in (personas := [persona.id for persona in catalog.personas]):
+        return f"Pick one of the personas: {', '.join(personas)}."
+    return None
 
 
 @dataclass(frozen=True)

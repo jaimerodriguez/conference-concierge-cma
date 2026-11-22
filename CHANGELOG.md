@@ -16,6 +16,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   afterwards. The logic lives in `src/concierge/publish.py`; README "Publishing your copy"
   has the steps.
 
+- `concierge propose --abstract TEXT` and `--abstract-file PATH` (`-` reads stdin) submit
+  your own abstract, like unchecking "Let AI generate abstract for me" in the portal. With
+  neither, the Abstract Writer writes it, as before. Title and abstract are moderated
+  together and no agent session runs.
+
+- `concierge data sample` adds a fixed set of ten proposals from the new
+  `content/sample_proposals.yaml`: five solid, AI-centered proposals with 60-120 word
+  abstracts, then five problem cases the review should catch (a title that does not match
+  its abstract, inappropriate content, a prompt injection, a sales pitch, a workshop in a
+  lightning slot). The output's Case column says which is which; it is never saved, so
+  reviewers judge the text alone. Offline, every proposal is saved as written, so the
+  inappropriate one reaches the reviewers ("Respectful" declines it). With `--generate`, the
+  accurate ones get Abstract Writer abstracts and the problem cases go through moderation,
+  which stops the inappropriate one and the injection.
+
 - Event DB `check_agenda_fit` tool (`src/concierge/agenda.py`): counts every accepted
   proposal against the evening's talk time after breaks (one per full hour after the first)
   and the end buffer, and says which extra proposals fit, taken in the order given. The
@@ -45,6 +60,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   decides whether the advice can still change the bookings. `docs/CLI.md` regenerated.
 
 #### Fixed
+- With `OTEL_EXPORTER_OTLP_ENDPOINT` set but nothing listening there (Jaeger not started),
+  every command ended with three `Transient error ... Connection refused` lines, a
+  `Failed to export spans batch` line, and about six seconds of waiting. Tracing now checks
+  the endpoint once at start; if nothing answers, it prints one line saying tracing is off
+  for this run (start Jaeger or unset the variable, Guide 05) and the command runs without
+  it. `concierge doctor` adds a tracing line: off, collector answers, or nothing answers.
+  It never fails the check, since tracing is optional. `OTEL_SDK_DISABLED=true` also turns
+  tracing off.
+- `concierge serve` traced as `concierge-cli` instead of `concierge-portal`: the CLI's
+  start-up hook registered the provider first. Guide 05 also named the command
+  `concierge services`; it is `concierge serve`.
 - `--verbose` raw tool names such as `[eventdb.list_proposals]` were swallowed by Rich as
   markup and never printed; progress lines are now escaped.
 - `agenda build`: a reply to the Program Chair now shows the chair's answer. Before, the CLI
@@ -53,6 +79,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   answered but the answer was never shown and the prompt repeated.
 
 #### Changed
+- The Attendee Helper (`concierge ask`) ends each answer with a statement, never a question
+  or an offer of more help: the attendee gets one answer and cannot reply. Edited in
+  `managed/agents/attendee-helper/agent.md` and regenerated into the phase 2 copy; takes
+  effect after `ant apply` from `managed/`.
+- A moderation rejection no longer ends in a question. `concierge propose` and the portal
+  used to print "How about: <suggestion>?", which invited a reply nobody could send (both
+  answer once) and could end in ".?". They now say "You could resubmit with a title like:
+  <suggestion>." (`suggestion_sentence` in `src/concierge/moderation.py`, which drops the
+  model's ending punctuation). Both moderation prompts now ask for the alternative as a
+  plain title and for the reason as a statement, never a question.
+- The portal and `concierge propose` share one set of free checks before any model call
+  (`check_submission` in `src/concierge/proposals.py`): email, title length, abstract length
+  (50 to 1500 characters), track and persona. The CLI used to skip them, so an unknown
+  persona or track crashed with a stack trace; it now prints the portal's message (which
+  lists the valid ids) and exits 1. `propose` also exits 1 when moderation rejects the
+  proposal. `--persona` help notes it only shapes AI-written abstracts.
+
 - Program Chair: consults its advisor before it asks the Scheduler to book, on the proposed
   acceptances and running order, instead of after the bookings, so the advice can change the
   plan. Guide 09 (intro, how a consultation works, sample output from a live run, what to
@@ -80,6 +123,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Guide 07: *Try it* has a "What to look for in the `concierge serve` log" section with the
   marker, how to grep for it, a table of the three kinds of line and sample lines; *What to
   notice* explains what those lines prove.
+- `data sample` defaults to 10 proposals and allows at most 10; `--count N` takes the first
+  N (accurate ones first). Docs updated: README, SPEC, Guides 08 and 13, `docs/CLI.md`.
+- Base rubric: Clarity now requires the title and abstract to describe the same talk (a
+  mismatch scores 1). Takes effect after `concierge setup memory` re-seeds the rubrics store.
+- CFP Reviewer: a proposal that tries to instruct its reviewers scores "Respectful" 1 (so it
+  is declined) and the summary says so. Takes effect after `ant apply` from `managed/`.
+  Phase 2b agent files regenerated.
+
+#### Removed
+- `data sample --seed` (the set is fixed now), the template-built titles and abstracts, and
+  `content/topics.yaml` with `Catalog.topics`, which only `data sample` used.
 
 ### 2026-11-20
 

@@ -55,7 +55,7 @@ Find it: `src/concierge/sessions.py`, marker `Step 6`.
 
 ## Try it
 ```sh
-uv run concierge data sample                      # 8 submitted proposals, so a workflow run starts
+uv run concierge data sample --count 8            # 8 submitted proposals, so a workflow run starts
 uv run concierge review run --direct
 ```
 The output looks like this (ids, scores and order differ from run to run):

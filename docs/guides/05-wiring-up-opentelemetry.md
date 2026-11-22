@@ -28,9 +28,9 @@ needs no setup. Add OpenTelemetry when you want traces in your own tools.
 
 | Setting | Where | What it does |
 |---|---|---|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `.env` (an `export` in your shell wins if both are set) | Where spans go. `http://localhost:4318` is the local Jaeger. **Unset means tracing is off**: nothing is recorded or sent. This is a standard OTel variable, so the exporter also honors the other standard ones, such as `OTEL_EXPORTER_OTLP_HEADERS` for a backend that needs an API key. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `.env` (an `export` in your shell wins if both are set) | Where spans go. `http://localhost:4318` is the local Jaeger. **Unset means tracing is off**: nothing is recorded or sent. If it is set but nothing answers there (Jaeger is not running), each command prints one line saying tracing is off for that run and carries on; `concierge doctor` shows the same. `OTEL_SDK_DISABLED=true` also turns tracing off. This is a standard OTel variable, so the exporter also honors the other standard ones, such as `OTEL_EXPORTER_OTLP_HEADERS` for a backend that needs an API key. |
 | `CONCIERGE_OTEL_CONTENT_MODE` | `.env` (or your shell) | How much detail spans carry: `metadata_only` (the demo's default) or `content`. See *Content mode* below. |
-| Service name | Code, not a setting | How a process appears in Jaeger: `concierge-cli` for terminal commands, `concierge-portal` for `concierge services`. |
+| Service name | Code, not a setting | How a process appears in Jaeger: `concierge-cli` for terminal commands, `concierge-portal` for `concierge serve`. |
 
 | Port | Who listens | Used for |
 |---|---|---|

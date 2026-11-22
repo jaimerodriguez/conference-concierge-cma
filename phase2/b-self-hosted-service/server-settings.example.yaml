@@ -6,7 +6,7 @@
 mcp:
   # Empty by default. Matching is exact: no wildcards, no subdomains. URLs must be https.
   allowed_hostnames:
-    - coco.agenticpraxis.ai
+    - concierge.example.com
   # Only when the name resolves to a private address (10/8, 172.16/12, 192.168/16):
   # private_hostnames:
   #   - concierge.internal.example.com

@@ -23,8 +23,14 @@ from starlette.templating import Jinja2Templates
 from concierge.catalog import Catalog
 from concierge.clients import get_client
 from concierge.config import Settings
-from concierge.moderation import MAX_ABSTRACT_CHARS, MAX_TITLE_CHARS
-from concierge.proposals import MAX_EMAIL_CHARS, ProposalOutcome, normalize_email, submit_proposal
+from concierge.moderation import MAX_ABSTRACT_CHARS, MAX_TITLE_CHARS, suggestion_sentence
+from concierge.proposals import (
+    MAX_EMAIL_CHARS,
+    MIN_ABSTRACT_CHARS,
+    ProposalOutcome,
+    check_submission,
+    submit_proposal,
+)
 from concierge.services.store import Store
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -48,7 +54,6 @@ def mask_email(address: str) -> str:
 
 TEMPLATES.env.filters["mask_email"] = mask_email
 
-MIN_ABSTRACT_CHARS = 50
 RATE_LIMIT_SUBMISSIONS = 3  # per client address...
 RATE_LIMIT_WINDOW_SECONDS = 10 * 60  # ...per ten minutes
 MAX_CONCURRENT_JOBS = 8
@@ -156,23 +161,15 @@ def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[Bas
         }
 
     def validate(form: dict[str, Any]) -> str | None:
-        """The first problem with a submission, in the order the form asks, or None."""
-        known_personas = {persona.id for persona in catalog.personas}
-        known_tracks = {track.id for track in catalog.tracks}
-        if normalize_email(form["contact_email"]) is None:
-            return "Please enter a valid contact email, like sam@example.com."
-        if not form["title"]:
-            return "Give your talk a title."
-        if len(form["title"]) > MAX_TITLE_CHARS:
-            return f"Please keep the title under {MAX_TITLE_CHARS} characters."
-        if not form["ai_abstract"]:
-            if len(form["abstract"]) < MIN_ABSTRACT_CHARS:
-                return f"Please write an abstract of at least {MIN_ABSTRACT_CHARS} characters."
-            if len(form["abstract"]) > MAX_ABSTRACT_CHARS:
-                return f"Please keep the abstract under {MAX_ABSTRACT_CHARS} characters."
-        if form["track"] not in known_tracks or form["persona"] not in known_personas:
-            return "Pick a track and a persona."
-        return None
+        """The first problem with a submission, or None. `concierge propose` runs the same."""
+        return check_submission(
+            catalog,
+            contact_email=form["contact_email"],
+            title=form["title"],
+            track_id=form["track"],
+            persona_id=form["persona"],
+            abstract=None if form["ai_abstract"] else form["abstract"],
+        )
 
     async def index(request: Request) -> Response:
         return TEMPLATES.TemplateResponse(request, "form.html", form_context())
@@ -225,7 +222,7 @@ def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[Bas
             if job.outcome is not None:
                 message = job.outcome.message
                 if job.outcome.suggestion:
-                    message += f" How about: {job.outcome.suggestion}?"
+                    message += " " + suggestion_sentence(job.outcome.suggestion)
             else:
                 message = "Something went wrong. Please try again in a moment."
             return TEMPLATES.TemplateResponse(request, "form.html", form_context(message, job.form))

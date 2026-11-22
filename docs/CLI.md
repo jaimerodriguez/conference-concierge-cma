@@ -32,7 +32,7 @@ uv run concierge serve [OPTIONS]
 
 ## `concierge propose`
 
-Submit a proposal from the terminal (the portal does the same from a phone).
+Submit a proposal from the terminal, with the same choices as the portal form.
 
 ```sh
 uv run concierge propose TITLE [OPTIONS]
@@ -40,10 +40,12 @@ uv run concierge propose TITLE [OPTIONS]
 
 | Argument or option | Default | What it does |
 | --- | --- | --- |
-| `TITLE` | required | The talk's title. The agent writes the abstract. |
+| `TITLE` | required | The talk's title. It is always yours. |
 | `--email` | `sam@example.com` | Member's contact email. |
-| `--persona` | `weekend-hacker` | Speaker persona id from content/personas.yaml. |
+| `--abstract` | none | Your own abstract. Leave it out (and --abstract-file) to let AI write one. |
+| `--abstract-file` | none | Read your own abstract from a file, or from stdin with '-'. |
 | `--track` | `fun` | Track id from content/tracks.yaml. |
+| `--persona` | `weekend-hacker` | Speaker persona id from content/personas.yaml: the voice AI writes in. With your own abstract it is only saved with the member. |
 
 ## `concierge proposals`
 
@@ -246,7 +248,6 @@ uv run concierge data sample [OPTIONS]
 
 | Argument or option | Default | What it does |
 | --- | --- | --- |
-| `--count` | `8` | How many proposals to create. |
-| `--seed` | none | Seed for the random picks (offline mode), to repeat a set. |
-| `--generate / --no-generate` | off | Have the Abstract Writer write each abstract (the `propose` path). Costs about a cent each. |
+| `--count` | `10` | How many proposals to create, from the top of content/sample_proposals.yaml (the five accurate ones come first). Ten at most. |
+| `--generate / --no-generate` | off | Have the Abstract Writer write the accurate proposals' abstracts (the `propose` path, about a cent each); the problem cases go through moderation. |
 | `--yes` | off | With --generate: do not ask first. |

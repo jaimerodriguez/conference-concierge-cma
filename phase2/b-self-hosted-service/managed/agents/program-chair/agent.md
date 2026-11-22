@@ -22,7 +22,7 @@ tools:
 mcp_servers:
 - type: url
   name: eventdb
-  url: https://coco.agenticpraxis.ai/eventdb/mcp
+  url: https://concierge.example.com/eventdb/mcp
 multiagent:
   type: coordinator
   agents:

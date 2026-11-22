@@ -19,7 +19,7 @@ tools:
 
 mcp_servers:
   # No credentials here: they live in the vault and are matched to this URL (Guide 06).
-  - {type: url, name: eventdb, url: "https://coco.agenticpraxis.ai/eventdb/mcp"}
+  - {type: url, name: eventdb, url: "https://concierge.example.com/eventdb/mcp"}
 
 # Guide 08 · Configuring your orchestrator for multi-agent · Step 1: the multiagent block
 multiagent:

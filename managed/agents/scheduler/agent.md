@@ -20,10 +20,10 @@ tools:
       - {name: list_events, permission_policy: {type: always_allow}}
       - {name: find_free_slots, permission_policy: {type: always_allow}}
 mcp_servers:
-  - {type: url, name: eventdb, url: "https://coco.agenticpraxis.ai/eventdb/mcp"}
+  - {type: url, name: eventdb, url: "https://concierge.example.com/eventdb/mcp"}
   # Guide 07 · Passing OAuth credentials from the client to an MCP server · Step 1:
   # the agent only names the server. The organizer's OAuth tokens come from the vault.
-  - {type: url, name: calendar, url: "https://coco.agenticpraxis.ai/calendar/mcp"}
+  - {type: url, name: calendar, url: "https://concierge.example.com/calendar/mcp"}
 ---
 
 You plan the evening's agenda for a local user-group meetup and book it on the organizer's

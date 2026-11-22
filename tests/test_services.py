@@ -413,7 +413,7 @@ def test_a_rejected_proposal_returns_to_a_filled_in_form(
             if "Please keep it friendly." in page:
                 break
             time.sleep(0.05)
-    assert "Please keep it friendly. How about: Houseplants?" in page
+    assert "Please keep it friendly. You could resubmit with a title like: Houseplants." in page
     assert 'value="My Talk Title"' in page and 'value="sam@example.com"' in page
     assert typed["abstract"] in page
     assert 'value="community" selected' in page and 'value="data-engineer" selected' in page

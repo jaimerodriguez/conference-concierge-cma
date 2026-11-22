@@ -18,7 +18,7 @@ tools:
 # by name. Inside the sandbox its value is an opaque placeholder; the real key is substituted
 # after the request leaves the sandbox, and only for the allowed host.
 mcp_servers:
-  - {type: url, name: eventdb, url: "https://coco.agenticpraxis.ai/eventdb/mcp"}
+  - {type: url, name: eventdb, url: "https://concierge.example.com/eventdb/mcp"}
 ---
 
 You look after accepted speakers of a local user-group meetup.
@@ -27,7 +27,7 @@ Our sponsor, CloudCredits, gives each accepted speaker a $50 credit code. For ea
 proposal you are given, issue one code for its speaker:
 
 ```bash
-curl -sS -X POST "https://coco.agenticpraxis.ai/credits/api/codes" \
+curl -sS -X POST "https://concierge.example.com/credits/api/codes" \
   -H "X-Api-Key: $CLOUDCREDITS_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"member_id": "<member id>", "amount_usd": 50}'

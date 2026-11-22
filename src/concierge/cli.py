@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-import random
 import re
+import sys
 from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlsplit
@@ -49,10 +49,11 @@ console = Console()
 
 
 @app.callback()
-def main() -> None:
+def main(ctx: typer.Context) -> None:
     # Guide 05 · Wiring up OpenTelemetry · Step 1: set tracing up once, at process start,
-    # before the Claude client is created.
-    setup_telemetry("concierge-cli")
+    # before the Claude client is created. `serve` sets up its own service name.
+    if ctx.invoked_subcommand != "serve":
+        setup_telemetry("concierge-cli")
 
 
 def _client() -> Any:
@@ -547,19 +548,71 @@ def auth_calendar(
 
 @app.command()
 def propose(
-    title: Annotated[str, typer.Argument(help="The talk's title. The agent writes the abstract.")],
+    title: Annotated[str, typer.Argument(help="The talk's title. It is always yours.")],
     email: Annotated[str, typer.Option(help="Member's contact email.")] = "sam@example.com",
-    persona: Annotated[
-        str, typer.Option(help="Speaker persona id from content/personas.yaml.")
-    ] = "weekend-hacker",
+    abstract: Annotated[
+        str | None,
+        typer.Option(
+            help="Your own abstract. Leave it out (and --abstract-file) to let AI write one.",
+            show_default=False,
+        ),
+    ] = None,
+    abstract_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--abstract-file",
+            help="Read your own abstract from a file, or from stdin with '-'.",
+            show_default=False,
+            dir_okay=False,
+            allow_dash=True,
+        ),
+    ] = None,
     track: Annotated[str, typer.Option(help="Track id from content/tracks.yaml.")] = "fun",
+    persona: Annotated[
+        str,
+        typer.Option(
+            help="Speaker persona id from content/personas.yaml: the voice AI writes in. "
+            "With your own abstract it is only saved with the member."
+        ),
+    ] = "weekend-hacker",
 ) -> None:
-    """Submit a proposal from the terminal (the portal does the same from a phone)."""
-    from concierge.proposals import submit_proposal
+    """Submit a proposal from the terminal, with the same choices as the portal form.
+
+    By default the Abstract Writer agent writes the abstract for your title.
+
+    Pass --abstract or --abstract-file to write your own. Everything you type is moderated first.
+    """
+    from concierge.catalog import get_catalog
+    from concierge.moderation import suggestion_sentence
+    from concierge.proposals import check_submission, submit_proposal
     from concierge.services.store import Store
 
+    if abstract is not None and abstract_file is not None:
+        console.print("[red]Use --abstract or --abstract-file, not both.[/red]")
+        raise typer.Exit(2)
+    if abstract_file is not None:
+        if str(abstract_file) == "-":
+            abstract = sys.stdin.read()
+        elif abstract_file.is_file():
+            abstract = abstract_file.read_text(encoding="utf-8")
+        else:
+            console.print(f"[red]No abstract file at {abstract_file}.[/red]")
+            raise typer.Exit(2)
+    # The portal's free checks, before any model call: same order, same messages.
+    if problem := check_submission(
+        get_catalog(),
+        contact_email=email,
+        title=title,
+        track_id=track,
+        persona_id=persona,
+        abstract=abstract,
+    ):
+        console.print(f"[red]{problem}[/red]")
+        raise typer.Exit(1)
+
     settings = get_settings()
-    with console.status("Writing the abstract..."):
+    busy = "Writing the abstract..." if abstract is None else "Checking your abstract..."
+    with console.status(busy):
         outcome = submit_proposal(
             _client(),
             Store(settings.db_path),
@@ -567,16 +620,19 @@ def propose(
             persona_id=persona,
             track_id=track,
             title=title,
+            abstract=abstract,
         )
     if outcome.proposal:
         console.print(f"[bold]{outcome.proposal['title']}[/bold]  ({outcome.proposal['id']})")
         console.print(outcome.proposal["abstract"])
     console.print(outcome.message)
     if outcome.suggestion:
-        console.print(f"How about: {outcome.suggestion}?")
+        console.print(suggestion_sentence(outcome.suggestion))
     if outcome.session_id:
         console.print(f"[dim]Session:[/dim] {console_url(outcome.session_id)}")
     shutdown_telemetry()
+    if not outcome.accepted_for_review:
+        raise typer.Exit(1)
 
 
 # --- demo data ----------------------------------------------------------------------
@@ -692,84 +748,112 @@ def _apply_memory_reset(settings: Any, plan: Any) -> None:
 
 @data_app.command("sample")
 def data_sample(
-    count: Annotated[int, typer.Option(min=1, max=30, help="How many proposals to create.")] = 8,
-    seed: Annotated[
-        int | None, typer.Option(help="Seed for the random picks (offline mode), to repeat a set.")
-    ] = None,
+    count: Annotated[
+        int,
+        typer.Option(
+            min=1,
+            max=10,
+            help="How many proposals to create, from the top of content/sample_proposals.yaml "
+            "(the five accurate ones come first). Ten at most.",
+        ),
+    ] = 10,
     generate: Annotated[
         bool,
         typer.Option(
-            help="Have the Abstract Writer write each abstract (the `propose` path). Costs "
-            "about a cent each."
+            help="Have the Abstract Writer write the accurate proposals' abstracts (the "
+            "`propose` path, about a cent each); the problem cases go through moderation."
         ),
     ] = False,
     yes: Annotated[bool, typer.Option("--yes", help="With --generate: do not ask first.")] = False,
 ) -> None:
     """Add sample talk proposals, status "submitted", so `review run` has work.
 
-    Offline and free by default: templates filled from the personas, topics, and tracks.
+    Five are solid proposals; the rest are problem cases the review should catch: a title
+    that does not match its abstract, inappropriate content, a prompt injection, a sales
+    pitch, and a workshop squeezed into a lightning slot. The Case column says which is which
+    and is never saved, so reviewers judge each proposal on its own text.
 
-    Each sample speaker has a distinct contact email. Nothing in your Anthropic workspace is
-    created.
+    Offline and free by default: every proposal is saved as written, so the inappropriate one
+    reaches the reviewers. With --generate, moderation screens the problem cases first.
+    Nothing in your Anthropic workspace is created.
     """
     from concierge.catalog import get_catalog
     from concierge.sample_data import (
         GENERATE_CENTS_EACH,
         create_offline,
-        plan_samples,
-        sample_title,
+        get_samples,
+        pick_samples,
     )
     from concierge.services.store import Store
 
     settings = get_settings()
     store = Store(settings.db_path)
     catalog = get_catalog()
+    samples = pick_samples(get_samples(), count)
     if not generate:
-        created = create_offline(store, catalog, count, seed)
-        _show_samples(created, store)
+        created = create_offline(store, catalog, samples)
+        _show_samples(list(zip(samples, created, strict=True)), store)
         console.print(f"Added {_plural(len(created), 'proposal')} (offline, no cost).")
         return
 
     from concierge.proposals import submit_proposal
 
-    cost = count * GENERATE_CENTS_EACH / 100
+    written = sum(sample.accurate for sample in samples)
+    screened = len(samples) - written
     console.print(
-        f"The Abstract Writer will write {_plural(count, 'abstract')}: about ${cost:.2f} "
-        "in total, one session each."
+        f"The Abstract Writer will write {_plural(written, 'abstract')}: about "
+        f"${written * GENERATE_CENTS_EACH / 100:.2f} in total, one session each. "
+        f"{_plural(screened, 'problem case')} keep their own abstracts and only go through "
+        "moderation (a fraction of a cent each)."
     )
     if not yes and not typer.confirm("Go ahead?", default=False):
         console.print("Nothing created.")
         raise typer.Exit(1)
     client = _client()
     created = []
-    rng = random.Random(seed)
-    for number, plan in enumerate(plan_samples(catalog, count, seed), start=1):
-        with console.status(f"Writing abstract {number} of {count} ({plan.contact_email})..."):
+    for number, sample in enumerate(samples, start=1):
+        doing = "Writing abstract" if sample.accurate else "Screening proposal"
+        with console.status(f"{doing} {number} of {count} ({sample.contact_email})..."):
             outcome = submit_proposal(
                 client,
                 store,
-                contact_email=plan.contact_email,
-                persona_id=plan.persona.id,
-                track_id=plan.track.id,
-                title=sample_title(plan, rng),
+                contact_email=sample.contact_email,
+                persona_id=sample.persona,
+                track_id=sample.track,
+                title=sample.title,
+                abstract=None if sample.accurate else sample.abstract,
             )
         if outcome.proposal:
-            created.append(outcome.proposal)
+            created.append((sample, outcome.proposal))
+        elif sample.accurate:
+            console.print(f"[yellow]Skipped {sample.contact_email}:[/yellow] {outcome.message}")
         else:
-            console.print(f"[yellow]Skipped {plan.contact_email}:[/yellow] {outcome.message}")
+            console.print(
+                f"[green]Moderation stopped[/green] {sample.contact_email} ({sample.case}): "
+                f"{outcome.message}"
+            )
     _show_samples(created, store)
     console.print(f"Added {_plural(len(created), 'proposal')}.")
     shutdown_telemetry()
 
 
-def _show_samples(created: list[dict[str, Any]], store: Any) -> None:
-    table = Table("ID", "Title", "Track", "Contact email")
-    for proposal in created:
+def _show_samples(created: list[tuple[Any, dict[str, Any]]], store: Any) -> None:
+    table = Table("ID", "Title", "Track", "Contact email", "Case")
+    for sample, proposal in created:
         member = store.get_member(proposal["member_id"]) or {}
+        case = sample.case if sample.accurate else f"[yellow]{sample.case}[/yellow]"
         table.add_row(
-            proposal["id"], proposal["title"], proposal["track"], member.get("contact_email", "?")
+            proposal["id"],
+            proposal["title"],
+            proposal["track"],
+            member.get("contact_email", "?"),
+            case,
         )
     console.print(table)
+    console.print(
+        "[dim]The Case column is for you: it is not saved, so reviewers never see it. "
+        "What each case should trigger: content/sample_proposals.yaml.[/dim]"
+    )
 
 
 @app.command()
@@ -1092,6 +1176,7 @@ def doctor(
     for label, ok, fix in checks:
         mark = "[green]ok[/green]" if ok else "[red]todo[/red]"
         console.print(f"{mark}  {label}" + ("" if ok else f"  ->  {fix}"))
+    _print_tracing_status()
 
     # Where the server address lives, and whether every copy agrees.
     rows, findings = wiring.check_local(settings)
@@ -1149,6 +1234,25 @@ def doctor(
     )
     if not all(ok for _, ok, _ in checks) or wiring.problems(findings):
         raise typer.Exit(1)
+
+
+def _print_tracing_status() -> None:
+    """One doctor line on tracing. Tracing is optional, so it never fails the check."""
+    from concierge.telemetry import GUIDE, collector_reachable, otel_endpoint
+
+    endpoint = otel_endpoint()
+    if endpoint is None:
+        console.print(
+            f"[cyan]note[/cyan]  tracing off (OTEL_EXPORTER_OTLP_ENDPOINT unset; see {GUIDE})"
+        )
+    elif collector_reachable(endpoint):
+        console.print(f"[green]ok[/green]  tracing collector answers at {endpoint}")
+    else:
+        console.print(
+            f"[cyan]note[/cyan]  nothing answers at {endpoint} (OTEL_EXPORTER_OTLP_ENDPOINT), "
+            "so commands run without tracing  ->  `docker compose up -d` from the repository "
+            "root, or unset the variable"
+        )
 
 
 def entry_point() -> None:

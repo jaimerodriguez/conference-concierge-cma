@@ -24,7 +24,7 @@ tools:
         member_id: {type: string, description: The speaker's member id from the Event DB.}
       required: [member_id]
 mcp_servers:
-  - {type: url, name: eventdb, url: "https://coco.agenticpraxis.ai/eventdb/mcp"}
+  - {type: url, name: eventdb, url: "https://concierge.example.com/eventdb/mcp"}
 ---
 
 You look after accepted speakers of a local user-group meetup.

@@ -34,10 +34,10 @@ tools:
 mcp_servers:
 - type: url
   name: eventdb
-  url: https://coco.agenticpraxis.ai/eventdb/mcp
+  url: https://concierge.example.com/eventdb/mcp
 - type: url
   name: calendar
-  url: https://coco.agenticpraxis.ai/calendar/mcp
+  url: https://concierge.example.com/calendar/mcp
 ---
 
 You plan the evening's agenda for a local user-group meetup and book it on the organizer's

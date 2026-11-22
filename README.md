@@ -172,7 +172,8 @@ For a clean start, clear the data from earlier runs and add sample proposals fir
 [Demo data](#demo-data) below): `uv run concierge data clear`, then `uv run concierge data sample`.
 
 ```sh
-uv run concierge propose "Building AI agents"     # or use the form at your tunnel address
+uv run concierge propose "Building AI agents"     # AI writes the abstract; or use the form at your tunnel address
+uv run concierge propose "Building AI agents" --abstract-file my-abstract.md   # or bring your own abstract
 uv run concierge review run                       # fire the daily review now
 uv run concierge agenda build                     # approve bookings and perk codes (y, n, or a for all)
 uv run concierge ask "Where do I park?"           # the Attendee Helper, from memory
@@ -185,14 +186,18 @@ docker compose up -d                              # Jaeger at http://localhost:1
 Separate from setup. These commands clear and add the data that runs create.
 
 ```sh
-uv run concierge data sample             # 8 submitted proposals, offline and free
-uv run concierge data sample --generate  # abstracts by the Abstract Writer, about 1 cent each
+uv run concierge data sample             # 10 submitted proposals, offline and free
+uv run concierge data sample --generate  # same set; accurate abstracts by the Abstract Writer (about 1 cent each), problem cases moderated
 uv run concierge data clear              # local Event DB + run notes in ops-notes (asks first)
 uv run concierge data clear --local-only # only the local Event DB, works offline
 ```
 
-`data sample` gives each proposal a distinct speaker and spreads them over the tracks
-(`--count`, `--seed`). `data clear` deletes members, proposals, reviews, calendar events and
+`data sample` adds the proposals in `content/sample_proposals.yaml`, each from a distinct
+speaker. Five are solid; the other five are problem cases the review should catch: a title
+that does not match its abstract, inappropriate content, a prompt injection, a sales pitch,
+and a workshop squeezed into a lightning slot. The command prints which is which (never
+saved, so reviewers judge the text alone), and the file says what each should trigger.
+`--count N` takes the first N, accurate ones first, ten at most. `data clear` deletes members, proposals, reviews, calendar events and
 perks from the local Event DB. It also resets the ops-notes memory store in your workspace
 to `content/ops-notes`: the notes agents wrote during runs are deleted, by name, after you
 confirm. That deletion is permanent. It keeps the Calendar sign-in, `content/`, the rubrics
@@ -222,7 +227,7 @@ Something went wrong? Start with `uv run concierge doctor`, then see
 
 ```
 managed/     what `ant apply` manages: agents, environments, memory stores, vault, deployment
-content/     venue profiles, rubrics, personas, topics (plain Markdown and YAML)
+content/     venue profiles, rubrics, personas, sample proposals (plain Markdown and YAML)
 src/concierge/
   cli.py            the `concierge` command
   sessions.py       the event loop every flow shares

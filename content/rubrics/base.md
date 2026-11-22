@@ -2,7 +2,7 @@
 
 Score each criterion from 1 (weak) to 5 (excellent). Give one sentence of evidence per score.
 
-- **Clarity:** A newcomer can tell from the title and abstract what the talk is about.
+- **Clarity:** A newcomer can tell from the title and abstract what the talk is about, and both describe the same talk. A title that promises a different subject from the abstract scores 1.
 - **Takeaway:** The abstract names at least one concrete thing the audience will learn or be able to do.
 - **Fit for the slot:** The scope fits the format (25-minute talk or 5-minute lightning talk).
 - **Originality:** The angle is fresh, or a familiar topic is given a personal twist.

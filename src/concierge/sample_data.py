@@ -1,11 +1,18 @@
 """Demo data: a batch of submitted proposals so `review run` has work, and a way to clear it.
 
-Two ways to make proposals:
-- offline (the default): free and instant. Titles and abstracts come from the templates
-  below, filled with the predefined personas, topics, and tracks in content/.
-- generated: each title comes from the templates below, and the Abstract Writer writes its
-  abstract through the same code `concierge propose` uses (moderation included). About a
-  cent each.
+The proposals live in ``content/sample_proposals.yaml``: five solid ones, then deliberate
+problem cases (a title that does not match its abstract, inappropriate content, a prompt
+injection, a sales pitch, a workshop squeezed into a lightning slot). Each problem case fails
+one thing the review process checks, so the demo shows the process catching it.
+
+Two ways to add them:
+- offline (the default): free and instant. Every proposal is saved as written, straight into
+  the Event DB, so even the inappropriate one reaches the CFP Reviewers. That shows the
+  second line of defense: the "Respectful" criterion declines it and the digest names it.
+- generated: the accurate proposals get their abstract from the Abstract Writer, through the
+  same code `concierge propose` uses. The problem cases keep their own abstracts and go
+  through the "write my own abstract" path, so moderation screens them first and stops the
+  ones that cross the line: the front door.
 
 Everything here touches only the local SQLite store. Nothing in the Anthropic workspace
 (agents, vaults, memory stores, sessions, the deployment) is created or removed.
@@ -13,168 +20,81 @@ Everything here touches only the local SQLite store. Nothing in the Anthropic wo
 
 from __future__ import annotations
 
-import random
-from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
-from concierge.catalog import Catalog, Persona, Track
+import yaml
+from pydantic import BaseModel
+
+from concierge.catalog import Catalog
+from concierge.config import get_settings
 from concierge.services.store import Store
 
-# Distinct contact emails, so every sample proposal has a recognizable speaker.
-# example.com is reserved for examples: nothing is ever delivered there.
-SAMPLE_EMAILS = tuple(
-    f"{name}@example.com"
-    for name in (
-        "ada",
-        "bao",
-        "carmen",
-        "dev",
-        "elif",
-        "farah",
-        "gus",
-        "hana",
-        "ivo",
-        "juno",
-        "kofi",
-        "lena",
-    )
-)
+SAMPLE_FILE = "sample_proposals.yaml"
+MAX_SAMPLES = 10
+ACCURATE = "accurate"
 
 # Roughly what one generated abstract cost in earlier runs (Abstract Writer session).
 GENERATE_CENTS_EACH = 1
 
-_TITLES = {
-    "ai-ml": [
-        "{Topic} on a Weekend Budget",
-        "What I Got Wrong About {Topic}",
-        "{Topic}, From Notebook to Production",
-    ],
-    "community": [
-        "Learning {Topic} Together: Notes From Our Study Group",
-        "{Topic} for Everyone",
-        "How Our Meetup Taught Itself {Topic}",
-    ],
-    "lightning": [
-        "{Topic} in Five Minutes",
-        "Five Things I Learned From {Topic}",
-        "A Lightning Tour of {Topic}",
-    ],
-    "fun": [
-        "My Unreasonable Obsession With {Topic}",
-        "{Topic}: A Saturday-Morning Experiment",
-        "Overengineering {Topic} for Fun",
-    ],
-}
 
-_OPENERS = {
-    "weekend-hacker": "I started tinkering with {topic} on a Saturday morning and never stopped.",
-    "data-engineer": "I have spent too many late nights cleaning up data about {topic}.",
-    "community-organizer": "Our group first came together over {topic}.",
-    "curious-student": "Six months ago I knew nothing about {topic}, so I asked questions.",
-    "startup-founder": "We built, broke, and rebuilt a side project around {topic}.",
-}
+class SampleProposal(BaseModel):
+    """One sample proposal, and what the review process should do with it.
 
-_BODIES = {
-    "talk": [
-        "This talk walks through what worked, what failed, and the one change that made the "
-        "biggest difference. You will leave with a short checklist you can try at home.",
-        "I will share the tools, the numbers before and after, and the mistakes that cost me "
-        "the most time, so you can skip them.",
-        "Expect a live demo, a few honest failures, and a clear path for getting started "
-        "this weekend.",
-    ],
-    "lightning": [
-        "In five minutes I will show the setup, one surprising result, and the single tip I "
-        "wish someone had told me on day one.",
-        "Five minutes, one demo, and a question for the audience to vote on.",
-        "A quick before-and-after, plus the one thing I would do differently.",
-    ],
-}
+    ``case`` and ``expect`` are for the presenter only. They are never saved, so the
+    reviewers judge the proposal on its title and abstract alone.
+    """
 
-
-@dataclass(frozen=True)
-class SamplePlan:
-    """One proposal to create: who, in which voice, on what, in which track."""
-
+    case: str
+    expect: str
     contact_email: str
-    persona: Persona
-    topic: str
-    track: Track
+    persona: str
+    track: str
+    title: str
+    abstract: str
+
+    @property
+    def accurate(self) -> bool:
+        return self.case == ACCURATE
 
 
-def plan_samples(catalog: Catalog, count: int, seed: int | None = None) -> list[SamplePlan]:
-    """Pick ``count`` varied proposals: distinct emails, mixed personas, tracks, and topics."""
-    rng = random.Random(seed)
-    emails = rng.sample(SAMPLE_EMAILS, k=min(count, len(SAMPLE_EMAILS)))
-    while len(emails) < count:  # more proposals than emails: some speakers submit twice
-        emails.append(rng.choice(SAMPLE_EMAILS))
-    topics = _spread(rng, catalog.topics, count)
-    tracks = _spread(rng, catalog.tracks, count)
-    return [
-        SamplePlan(
-            contact_email=email, persona=rng.choice(catalog.personas), topic=topic, track=track
-        )
-        for email, topic, track in zip(emails, topics, tracks, strict=True)
-    ]
+def load_samples(content_dir: Path) -> list[SampleProposal]:
+    raw = yaml.safe_load((content_dir / SAMPLE_FILE).read_text(encoding="utf-8"))
+    samples = [SampleProposal.model_validate(item) for item in raw]
+    if len(samples) > MAX_SAMPLES:
+        raise ValueError(f"{SAMPLE_FILE} has {len(samples)} proposals; keep it to {MAX_SAMPLES}.")
+    return samples
 
 
-def _spread[T](rng: random.Random, items: list[T], count: int) -> list[T]:
-    """``count`` picks that use every item before repeating any."""
-    picks: list[T] = []
-    while len(picks) < count:
-        batch = list(items)
-        rng.shuffle(batch)
-        picks.extend(batch)
-    return picks[:count]
+@lru_cache
+def get_samples() -> list[SampleProposal]:
+    return load_samples(get_settings().content_dir)
 
 
-def write_offline(plan: SamplePlan, rng: random.Random) -> tuple[str, str]:
-    """A title and abstract from the templates, with no model call."""
-    topic = plan.topic
-    title = sample_title(plan, rng)
-    opener = _OPENERS.get(plan.persona.id, "I have been exploring {topic} for a while.")
-    abstract = (
-        f"{opener.format(topic=_mid_sentence(topic))} {rng.choice(_BODIES[plan.track.format])}"
-    )
-    return title, abstract
-
-
-def sample_title(plan: SamplePlan, rng: random.Random) -> str:
-    """A talk title built from the plan's topic, such as "Model Distillation for Everyone"."""
-    template = rng.choice(_TITLES.get(plan.track.id, _TITLES["fun"]))
-    return template.format(Topic=_title_case(plan.topic))
-
-
-def _title_case(text: str) -> str:
-    """Capitalize each word but keep acronyms: "running models locally (RAG)" -> "Running Models
-    Locally (RAG)". ``str.title`` would turn "AI" into "Ai"."""
-    return " ".join(word[:1].upper() + word[1:] for word in text.split())
-
-
-def _mid_sentence(text: str) -> str:
-    """Lowercase the first letter for use inside a sentence, unless it starts an acronym."""
-    if len(text) > 1 and text[1].isupper():
-        return text
-    return text[:1].lower() + text[1:]
+def pick_samples(samples: list[SampleProposal], count: int) -> list[SampleProposal]:
+    """The first ``count`` samples: the accurate ones come first in the file."""
+    return samples[:count]
 
 
 def create_offline(
-    store: Store, catalog: Catalog, count: int, seed: int | None = None
+    store: Store, catalog: Catalog, samples: list[SampleProposal]
 ) -> list[dict[str, Any]]:
-    """Create ``count`` submitted proposals from templates. Free; no API calls."""
-    rng = random.Random(seed)
+    """Save the samples as written, status "submitted". Free; no API calls, no moderation."""
     created = []
-    for plan in plan_samples(catalog, count, seed):
-        title, abstract = write_offline(plan, rng)
-        member = store.find_or_add_member(plan.contact_email, persona=plan.persona.id)
+    for sample in samples:
+        track = catalog.track(sample.track)
+        member = store.find_or_add_member(
+            sample.contact_email, persona=catalog.persona(sample.persona).id
+        )
         created.append(
             store.add_proposal(
                 member_id=member["id"],
                 event_id=catalog.event.id,
-                track=plan.track.id,
-                format=plan.track.format,
-                title=title,
-                abstract=abstract,
+                track=track.id,
+                format=track.format,
+                title=sample.title,
+                abstract=sample.abstract,
                 source="sample",
             )
         )
