@@ -12,7 +12,7 @@ from concierge.abstracts import build_system_prompt
 from concierge.catalog import load_catalog, rubric_for_track
 from concierge.config import REPO_ROOT, Settings
 from concierge.managed import ManagedResources, NotAppliedError
-from concierge.moderation import MAX_TOPIC_CHARS, moderate_topic
+from concierge.moderation import MAX_TOPIC_CHARS, moderate_topic, suggestion_sentence
 from concierge.review import load_review_kickoff
 from concierge.sessions import budget
 
@@ -51,6 +51,17 @@ def test_moderation_rejects_empty_and_oversized_topics_without_a_model_call() ->
     no_client = None  # these checks must not reach the API
     assert moderate_topic(no_client, "   ").allowed is False  # type: ignore[arg-type]
     assert moderate_topic(no_client, "x" * (MAX_TOPIC_CHARS + 1)).allowed is False  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "suggestion",
+    ["Ocean waves power a laptop", "Ocean waves power a laptop.", " Ocean waves power a laptop?! "],
+)
+def test_a_suggestion_reads_as_a_closed_statement(suggestion: str) -> None:
+    # The CLI and the portal are one-shot: nobody can answer a question.
+    assert suggestion_sentence(suggestion) == (
+        "You could resubmit with a title like: Ocean waves power a laptop."
+    )
 
 
 def test_budget_uses_minor_units_as_a_string() -> None:
@@ -550,3 +561,50 @@ def test_a_host_error_is_explained_as_a_host_problem_not_an_mcp_problem(tmp_path
     text = " ".join(explain_issue(client, settings, "sesn_1", issue))
     assert "old.trycloudflare.com" in text and "setup vault" in text
     assert "MCP" not in text and "attached these vaults" not in text
+
+
+def test_agenda_budget_leaves_room_for_breaks_and_buffer() -> None:
+    from concierge.agenda import talk_budget
+
+    event = load_catalog(CONTENT).event  # 18:30-21:00, 10-minute breaks, 10-minute buffer
+    assert talk_budget(event) == {
+        "window_minutes": 150,
+        "breaks": 2,
+        "break_minutes": 20,
+        "buffer_minutes": 10,
+        "talk_minutes_available": 120,
+    }
+
+
+def test_agenda_fit_counts_what_is_already_accepted() -> None:
+    from concierge.agenda import check_fit
+
+    event = load_catalog(CONTENT).event
+
+    def proposal(n: int, fmt: str) -> dict[str, str]:
+        return {"id": f"p{n}", "title": f"Talk {n}", "format": fmt}
+
+    # The run that overran: 3 talks and 5 lightning talks already accepted (100 minutes).
+    accepted = [proposal(n, "talk") for n in range(3)]
+    accepted += [proposal(n, "lightning") for n in range(3, 8)]
+    candidates = [proposal(8, "talk"), proposal(9, "talk"), proposal(10, "lightning")]
+    candidates += [proposal(11, "lightning"), accepted[0]]
+
+    result = check_fit(event, accepted, candidates)
+
+    assert result["accepted_minutes"] == 100 and not result["already_overrun"]
+    # Neither talk fits in the 20 minutes left, but both lightning talks do.
+    assert [p["id"] for p in result["does_not_fit"]] == ["p8", "p9"]
+    assert [p["id"] for p in result["fits"]] == ["p10", "p11"]
+    assert result["minutes_left_after_fits"] == 10
+
+
+def test_agenda_fit_reports_an_existing_overrun() -> None:
+    from concierge.agenda import check_fit
+
+    event = load_catalog(CONTENT).event
+    accepted = [{"id": f"p{n}", "title": "T", "format": "talk"} for n in range(5)]
+
+    result = check_fit(event, accepted, [])
+
+    assert result["already_overrun"] and result["minutes_left_after_fits"] == -5

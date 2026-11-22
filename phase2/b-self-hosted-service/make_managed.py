@@ -60,12 +60,14 @@ def transform_agent(name: str, config: dict[str, Any], body: str) -> tuple[str, 
             'reviewer fails,\n  list its proposals as "Not covered".\n',
         )
         body = body.replace(
-            "- Before you present a final agenda, consult your advisor about balance: variety "
-            "of topics and\n  tracks, a mix of first-time and returning speakers, and a "
-            "sensible order for the evening.\n",
-            "- Before you present a final agenda, check its balance yourself: variety of "
-            "topics and tracks,\n  a mix of first-time and returning speakers, and a sensible "
-            "order for the evening.\n",
+            "- Before you ask the scheduler to book, consult your advisor about the proposed "
+            "acceptances\n  and a running order: variety of topics and tracks, a mix of "
+            "first-time and returning\n  speakers, and a sensible order for the evening. Then "
+            "accept the proposals and give the\n  scheduler the running order as a suggestion.\n",
+            "- Before you ask the scheduler to book, check the proposed acceptances and a "
+            "running order\n  yourself: variety of topics and tracks, a mix of first-time and "
+            "returning speakers, and a\n  sensible order for the evening. Then accept the "
+            "proposals and give the scheduler the\n  running order as a suggestion.\n",
         )
         changes.append("system prompt: workflow and advisor instructions rewritten")
         if "workflow run" in body or "advisor" in body:

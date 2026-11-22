@@ -1,4 +1,4 @@
-"""Load the demo's static content: personas, topics, tracks, and the event."""
+"""Load the demo's static content: personas, tracks, and the event."""
 
 from __future__ import annotations
 
@@ -30,6 +30,8 @@ class Slots(BaseModel):
     talk_minutes: int
     lightning_minutes: int
     break_minutes: int
+    # Kept free before the end of the evening, because talks run over (see ops-notes).
+    buffer_minutes: int = 10
 
 
 class Event(BaseModel):
@@ -45,7 +47,6 @@ class Event(BaseModel):
 
 class Catalog(BaseModel):
     personas: list[Persona]
-    topics: list[str]
     tracks: list[Track]
     event: Event
 
@@ -72,7 +73,6 @@ def load_catalog(content_dir: Path) -> Catalog:
     return Catalog.model_validate(
         {
             "personas": _load_yaml(content_dir / "personas.yaml"),
-            "topics": _load_yaml(content_dir / "topics.yaml"),
             "tracks": _load_yaml(content_dir / "tracks.yaml"),
             "event": _load_yaml(content_dir / "event.yaml"),
         }

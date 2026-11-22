@@ -64,6 +64,47 @@ class SessionIssue:
         )
 
 
+@dataclass(frozen=True)
+class ThreadFinished:
+    """Made here, not by the platform: a workflow-run thread ended, with its own events.
+
+    A run thread's tool calls and messages stay on that thread's stream; the session stream
+    carries only its start and end. When the end arrives, ``follow_session`` reads the
+    thread's events and passes them to ``on_event`` as this, so the live output can say what
+    each reviewer did.
+    """
+
+    session_thread_id: str
+    agent_name: str
+    workflow_run_id: str
+    events: list[Any]
+    type: str = "concierge.thread_finished"
+
+
+# The platform names the built-in advisor's thread like this (Guide 09).
+ADVISOR_AGENT = "anthropic.advisor"
+
+
+@dataclass(frozen=True)
+class AdviceGiven:
+    """Made here, not by the platform: an advisor consultation ended, with its thread's stats.
+
+    The advice itself arrives redacted, so the client cannot read it. What it can read is the
+    advisor thread's record: which model answered, how long it took, how many tokens it read
+    (the agent's conversation so far) and wrote (the advice), and what that cost.
+    ``follow_session`` reads that record when the advisor thread ends and passes it to
+    ``on_event`` as this. The numbers are None when the record could not be read.
+    """
+
+    session_thread_id: str
+    model: str | None = None
+    seconds: float | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cost_cents: int | None = None
+    type: str = "concierge.advice_given"
+
+
 @dataclass
 class SessionResult:
     """What happened in one stretch of following a session."""
@@ -103,13 +144,13 @@ def user_message(text: str) -> dict[str, Any]:
 
 
 def _history_then_stream(
-    client: Anthropic,
-    session_id: str,
+    history: list[Any],
     stream: Iterable[Any],
     seen: set[str],
     answered: set[str],
     *,
     show_history: bool = True,
+    new_turn_sent: bool = False,
 ) -> Iterator[tuple[Any, bool, bool]]:
     """Yield ``(event, show, final_ok)`` for history not yet seen, then live events.
 
@@ -121,11 +162,16 @@ def _history_then_stream(
     ``answered`` gains every tool call the history already holds an answer for, so a call is
     never put to the person twice. ``final_ok`` is False for an idle event from history that
     a later status event superseded (an earlier turn), so it does not end the follow.
+
+    ``history`` must be read *before* sending anything. With ``new_turn_sent`` (we just sent a
+    message), every status in it belongs to an earlier turn: the idle that ended the last
+    turn must not be mistaken for the end of the turn our message starts.
     """
-    history = list(client.beta.sessions.events.list(session_id, order="asc"))
-    last_status = next(
-        (e.id for e in reversed(history) if e.type.startswith("session.status_")), None
-    )
+    last_status = None
+    if not new_turn_sent:
+        last_status = next(
+            (e.id for e in reversed(history) if e.type.startswith("session.status_")), None
+        )
     for event in history:
         if event.type == "user.tool_confirmation":
             answered.add(event.tool_use_id)
@@ -189,6 +235,7 @@ def follow_session(
     """
     result = SessionResult(session_id=session_id)
     open_runs: set[str] = set()  # workflow runs still in flight (Guide 08)
+    run_threads: dict[str, tuple[str, str]] = {}  # thread id -> (agent name, run id)
     answered: set[str] = set()
     seen: set[str] = set()
     text_parts: list[str] = []
@@ -262,6 +309,29 @@ def follow_session(
                 open_runs.discard(event.workflow_run_id)
                 result.workflow_runs[event.workflow_run_id] = event.result.type
 
+            # Guide 08 · Configuring your orchestrator for multi-agent · Step 6: see inside
+            # a run. Each thread a run starts is announced here with its run id, but its
+            # tool calls stay on its own stream, so read them when the thread ends and hand
+            # them to the progress display.
+            case "session.thread_created" if getattr(event, "workflow_run_id", None):
+                run_threads[event.session_thread_id] = (event.agent_name, event.workflow_run_id)
+            case "session.thread_status_terminated" if event.session_thread_id in run_threads:
+                agent_name, run_id = run_threads.pop(event.session_thread_id)
+                if show and on_event is not None:
+                    thread_events = _thread_events(client, session_id, event.session_thread_id)
+                    on_event(
+                        ThreadFinished(event.session_thread_id, agent_name, run_id, thread_events)
+                    )
+
+            # Guide 09 · Adding an advisor · Step 3: see the consultation. The advice is
+            # redacted on every stream, but the advisor's thread record says which model
+            # answered and what it cost, so read it when the consultation ends.
+            case "session.thread_status_terminated" if (
+                getattr(event, "agent_name", None) == ADVISOR_AGENT
+            ):
+                if show and on_event is not None:
+                    on_event(_advice_given(client, session_id, event.session_thread_id))
+
             case "session.status_idle" if final_ok:
                 reason = event.stop_reason.type
                 if reason == "requires_action":
@@ -285,14 +355,28 @@ def follow_session(
                 )
                 time.sleep(min(2**attempt, 10))
             with client.beta.sessions.events.stream(session_id) as stream:
+                catch_up = bool(attempt) or include_history or attach
+                # Read the history before sending, so it holds only what came before our
+                # message. Everything after it arrives on the stream.
+                history = (
+                    list(client.beta.sessions.events.list(session_id, order="asc"))
+                    if catch_up
+                    else []
+                )
+                sending = attempt == 0 and bool(send)
                 # Stream first, then send: events emitted before the stream opens are not
                 # replayed.
-                if attempt == 0 and send:
+                if sending:
                     client.beta.sessions.events.send(session_id, events=send)
-                if attempt or include_history or attach:
+                if catch_up:
                     show = bool(attempt) or include_history
                     events = _history_then_stream(
-                        client, session_id, stream, seen, answered, show_history=show
+                        history,
+                        stream,
+                        seen,
+                        answered,
+                        show_history=show,
+                        new_turn_sent=sending,
                     )
                 else:
                     events = _live(stream, seen)
@@ -304,6 +388,44 @@ def follow_session(
 
     result.text = "\n".join(text_parts)
     return result
+
+
+def _thread_events(client: Anthropic, session_id: str, thread_id: str) -> list[Any]:
+    """Everything one session thread did, oldest first. Empty if the server refuses."""
+    try:
+        return list(client.beta.sessions.threads.events.list(thread_id, session_id=session_id))
+    except anthropic.APIError as error:
+        print(f"[concierge] could not read thread {thread_id}: {error}")
+        return []
+
+
+def _advice_given(client: Anthropic, session_id: str, thread_id: str) -> AdviceGiven:
+    """The advisor thread's model, duration, tokens and cost. Only the id if unreadable."""
+    try:
+        thread = client.beta.sessions.threads.retrieve(thread_id, session_id=session_id)
+    except anthropic.APIError as error:
+        print(f"[concierge] could not read advisor thread {thread_id}: {error}")
+        return AdviceGiven(thread_id)
+    usage = getattr(thread, "usage", None)
+    stats = getattr(thread, "stats", None)
+    cost = getattr(usage, "list_cost", None)
+    cache = getattr(usage, "cache_creation", None)
+    read = None
+    if usage is not None:  # everything the advisor read, cached or not
+        read = (
+            (usage.input_tokens or 0)
+            + (usage.cache_read_input_tokens or 0)
+            + (getattr(cache, "ephemeral_5m_input_tokens", 0) or 0)
+            + (getattr(cache, "ephemeral_1h_input_tokens", 0) or 0)
+        )
+    return AdviceGiven(
+        thread_id,
+        model=getattr(getattr(thread, "agent", None), "model", None),
+        seconds=getattr(stats, "duration_seconds", None),
+        input_tokens=read,
+        output_tokens=getattr(usage, "output_tokens", None),
+        cost_cents=int(cost.amount) if cost is not None and cost.amount is not None else None,
+    )
 
 
 def _send_answer(client: Anthropic, session_id: str, event: dict[str, Any]) -> None:

@@ -37,16 +37,47 @@ authorization server issued, and records bookings as made by the organizer.
 Find it: `src/concierge/services/app.py`, marker `Step 6`.
 
 ## Try it
+Keep the terminal that runs `uv run concierge serve` in view: it is the log of both the
+authorization server and the Calendar MCP server.
 ```sh
 uv run concierge auth calendar        # opens the sign-in page; use CONCIERGE_ORGANIZER_PASSWORD
 uv run concierge agenda build
 ```
-Access tokens from the mock server last 15 minutes on purpose. Wait, run again, and watch
-`concierge serve` log a `refresh_token` grant that you did not make.
+
+### What to look for in the `concierge serve` log
+Every line about OAuth starts with a big marker, shown in bold yellow in the terminal:
+```
+========== OAUTH ==========
+```
+To see only those lines, search the terminal for `OAUTH`, or run
+`uv run concierge serve 2>&1 | grep OAUTH`. There are three kinds:
+
+| Kind | When you see it | What it proves |
+| --- | --- | --- |
+| `SIGN-IN` | Once, when `concierge auth calendar` finishes | Your client exchanged the code for tokens; they went into the vault. |
+| `MCP CALL` | Each Calendar MCP tool call, including every booking you approve in `agenda build` | The agent's call reached the MCP server with the organizer's OAuth access token, added by Anthropic's MCP proxy. |
+| `REFRESH` | When the access token has expired (after 15 minutes) and the agent calls the calendar again | Anthropic refreshed the token for the vault. You did not make this call. |
+
+Sample lines (your titles and times will differ):
+```
+INFO:     ========== OAUTH ========== SIGN-IN: issued tokens for organizer (authorization_code grant). The access token expires in 15 min.
+INFO:     ========== OAUTH ========== MCP CALL: Calendar MCP find_free_slots authorized by the OAuth access token for organizer
+INFO:     ========== OAUTH ========== MCP CALL: Calendar MCP create_event authorized by the OAuth access token for organizer: booking 'Opening talk' in Main Hall at 2026-12-10T18:30
+INFO:     ========== OAUTH ========== REFRESH: new access token for organizer (refresh_token grant, made by Anthropic for the vault, not by you). The old refresh token is retired.
+```
+Each booking you approve in `agenda build` should match one `MCP CALL ... create_event` line.
+To see a `REFRESH`, wait more than 15 minutes after signing in and run `agenda build` again.
+
+If a refresh is ever refused (for example, the vault holds a refresh token that was already
+used), you see a `WARNING: ========== OAUTH ========== REFUSED: ...` line instead. Sign in
+again with `concierge auth calendar`.
 
 ## What to notice
 - The tokens go from your client straight into the vault. They are not written to disk, put
   in a prompt, or seen by the agent.
+- The agent never handles the token, yet every `OAUTH ... MCP CALL` line proves the token
+  reached the MCP server: Anthropic's MCP proxy added it on the way. The server knows *who* is acting, so it records each booking as
+  made by the organizer. The log names the grant and the subject, never a token value.
 - Credentials are matched to MCP servers by URL. If your tunnel address changes, sign in again.
 - Vaults attach at session creation only.
 - An invalid credential does not block the session: it surfaces as a `session.error` event.

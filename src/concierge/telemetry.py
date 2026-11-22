@@ -3,7 +3,8 @@
 Two independent sources of spans exist (see docs/guides/05-wiring-up-opentelemetry.md):
 
 * **SDK tracing** (this file): the Claude SDK emits spans in *this* process and our exporter
-  sends them to the collector.
+  sends them to your backend
+  (Jaeger, locally).
 * **API tracing**: Anthropic emits server-side spans (model requests, agent turns, tool runs)
   to a destination an organization admin adds. No code; the guide covers it.
 
@@ -13,7 +14,11 @@ When both are on, the API's spans nest under the SDK's span of the same request.
 from __future__ import annotations
 
 import os
+import socket
+import sys
+from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
@@ -21,18 +26,84 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 _provider: TracerProvider | None = None
+_warned_unreachable = False
+
+GUIDE = "docs/guides/05-wiring-up-opentelemetry.md"
+
+
+def load_otel_env(env_file: Path | None = None) -> None:
+    """Copy ``OTEL_*`` variables from the repo's ``.env`` into the process environment.
+
+    The OpenTelemetry exporter reads only the process environment, while the demo's own
+    settings (``CONCIERGE_*``) come from ``.env``. Copying the standard ``OTEL_*`` variables
+    (endpoint, headers, and the rest) lets them live in ``.env`` too. A variable already set
+    in the shell wins, so ``export`` still overrides the file.
+    """
+    from dotenv import dotenv_values
+
+    from concierge.config import REPO_ROOT
+
+    path = env_file if env_file is not None else REPO_ROOT / ".env"
+    if not path.is_file():
+        return
+    for key, value in dotenv_values(path).items():
+        if key.startswith("OTEL_") and value is not None and key not in os.environ:
+            os.environ[key] = value
+
+
+def otel_endpoint() -> str | None:
+    """The OTLP endpoint from ``.env`` or the shell, or ``None`` when tracing is off.
+
+    ``OTEL_SDK_DISABLED=true`` (the standard OpenTelemetry switch) also turns it off.
+    """
+    load_otel_env()
+    if os.environ.get("OTEL_SDK_DISABLED", "").strip().lower() == "true":
+        return None
+    return os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") or None
+
+
+def collector_reachable(endpoint: str, timeout: float = 1.0) -> bool:
+    """Whether anything accepts a TCP connection at the endpoint's host and port.
+
+    A cheap check, so a CLI command does not export into nothing: without it, the exporter
+    retries for several seconds at exit and prints a ``Connection refused`` line per retry.
+    """
+    parts = urlsplit(endpoint)
+    if not parts.hostname:
+        return False
+    try:
+        port = parts.port or (443 if parts.scheme == "https" else 80)
+    except ValueError:  # a port that is not a number
+        return False
+    try:
+        with socket.create_connection((parts.hostname, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
 
 
 def setup_telemetry(service_name: str) -> TracerProvider | None:
     """Register a tracer provider once per process. Returns ``None`` when tracing is off.
 
-    Tracing is on when ``OTEL_EXPORTER_OTLP_ENDPOINT`` is set (for example to the collector
-    in ``docker-compose.yml``).
+    Tracing is on when ``OTEL_EXPORTER_OTLP_ENDPOINT`` is set, in ``.env`` or the shell (for
+    example to the Jaeger in ``docker-compose.yml``), and something answers there. When
+    nothing does, this prints one line saying so and the run goes on without tracing.
     """
-    global _provider
+    global _provider, _warned_unreachable
     if _provider is not None:
         return _provider
-    if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
+    endpoint = otel_endpoint()
+    if endpoint is None:
+        return None
+    if not collector_reachable(endpoint):
+        if not _warned_unreachable:
+            _warned_unreachable = True
+            print(
+                f"Tracing is off for this run: nothing answers at {endpoint} "
+                "(OTEL_EXPORTER_OTLP_ENDPOINT). Start Jaeger with `docker compose up -d` "
+                f"from the repository root, or unset the variable. See {GUIDE}.",
+                file=sys.stderr,
+            )
         return None
 
     # Guide 05 · Wiring up OpenTelemetry · Step 2: register the tracer provider.

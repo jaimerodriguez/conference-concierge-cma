@@ -32,18 +32,20 @@ uv run concierge serve [OPTIONS]
 
 ## `concierge propose`
 
-Submit a proposal from the terminal (the portal does the same from a phone).
+Submit a proposal from the terminal, with the same choices as the portal form.
 
 ```sh
-uv run concierge propose TOPIC [OPTIONS]
+uv run concierge propose TITLE [OPTIONS]
 ```
 
 | Argument or option | Default | What it does |
 | --- | --- | --- |
-| `TOPIC` | required | What the talk is about, in a sentence. |
-| `--name` | `Sam` | Member's first name. |
-| `--persona` | `weekend-hacker` | Speaker persona id from content/personas.yaml. |
+| `TITLE` | required | The talk's title. It is always yours. |
+| `--email` | `sam@example.com` | Member's contact email. |
+| `--abstract` | none | Your own abstract. Leave it out (and --abstract-file) to let AI write one. |
+| `--abstract-file` | none | Read your own abstract from a file, or from stdin with '-'. |
 | `--track` | `fun` | Track id from content/tracks.yaml. |
+| `--persona` | `weekend-hacker` | Speaker persona id from content/personas.yaml: the voice AI writes in. With your own abstract it is only saved with the member. |
 
 ## `concierge proposals`
 
@@ -107,6 +109,18 @@ uv run concierge setup host [HOSTNAME]
 | Argument or option | Default | What it does |
 | --- | --- | --- |
 | `HOSTNAME (optional)` | none | Defaults to the host in CONCIERGE_PUBLIC_BASE_URL (.env). |
+
+## `concierge setup public`
+
+Put the sample host and an empty vault list back, so the files are safe to publish.
+
+```sh
+uv run concierge setup public [OPTIONS]
+```
+
+| Argument or option | Default | What it does |
+| --- | --- | --- |
+| `--check` | off | Only list the files that hold your values; change nothing. |
 
 ## `concierge setup all`
 
@@ -173,7 +187,7 @@ uv run concierge auth calendar [OPTIONS]
 
 ## `concierge review run`
 
-Run the daily proposal review now and follow it.
+Run the daily proposal review now and follow it, reviewer by reviewer.
 
 ```sh
 uv run concierge review run [OPTIONS]
@@ -183,7 +197,7 @@ uv run concierge review run [OPTIONS]
 | --- | --- | --- |
 | `--direct / --no-direct` | off | Start an ordinary session instead of firing the deployment. |
 | `--force / --no-force` | off | Start the review even when no proposal is waiting. |
-| `--verbose` | off | Also show the raw tool names in the live output. |
+| `--verbose` | off | Also show each reviewer's own tool calls and the raw tool names. |
 
 ## `concierge review runs`
 
@@ -209,7 +223,7 @@ uv run concierge agenda build [INSTRUCTION] [OPTIONS]
 | --- | --- | --- |
 | `INSTRUCTION (optional)` | none | What to ask the Program Chair. Default: accept the top four, breaking ties for variety, then book. With --session: your reply, or leave it out to re-attach and answer what is waiting. |
 | `--session` | none | Continue this agenda session (sesn_...): answer any booking still waiting for approval, then follow it. |
-| `--verbose` | off | Also show the raw tool names in the live output. |
+| `--verbose` | off | Also show the advisor's token counts and the raw tool names. |
 
 ## `concierge data clear`
 
@@ -234,7 +248,6 @@ uv run concierge data sample [OPTIONS]
 
 | Argument or option | Default | What it does |
 | --- | --- | --- |
-| `--count` | `8` | How many proposals to create. |
-| `--seed` | none | Seed for the random picks (offline mode), to repeat a set. |
-| `--generate / --no-generate` | off | Have the Abstract Writer write each abstract (the `propose` path). Costs about a cent each. |
+| `--count` | `10` | How many proposals to create, from the top of content/sample_proposals.yaml (the five accurate ones come first). Ten at most. |
+| `--generate / --no-generate` | off | Have the Abstract Writer write the accurate proposals' abstracts (the `propose` path, about a cent each); the problem cases go through moderation. |
 | `--yes` | off | With --generate: do not ask first. |

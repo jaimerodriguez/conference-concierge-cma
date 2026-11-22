@@ -142,3 +142,120 @@ def test_re_attach_to_a_finished_session_ends_at_once() -> None:
     )
     result = follow_session(client, "s", attach=True)  # type: ignore[arg-type]
     assert result.stop_reason == "end_turn" and client.opened == 1
+
+
+def test_a_reply_to_a_finished_session_waits_for_and_shows_the_answer() -> None:
+    # The CLI's reply loop: the last turn ended, the person replies in the same session.
+    # The idle that ended the last turn must not end the follow before the answer arrives.
+    client = FakeClient(
+        history=[NS(type="user.message", id="u1"), _idle("i1", "end_turn")],
+        streams=[[_message("m2", "Understood."), _idle("i2", "end_turn")]],
+    )
+    shown: list[str] = []
+    result = follow_session(
+        client,  # type: ignore[arg-type]
+        "s",
+        send=[sessions.user_message("The email is valid.")],
+        attach=True,
+        on_text=shown.append,
+    )
+    assert client.sent[0]["type"] == "user.message"
+    assert shown == ["Understood."]
+    assert result.text == "Understood." and result.stop_reason == "end_turn"
+
+
+def test_a_finished_workflow_thread_is_reported_with_its_own_events() -> None:
+    reviewer_events = [
+        NS(
+            type="agent.mcp_tool_use",
+            id="r1",
+            mcp_server_name="eventdb",
+            name="record_review",
+            input={"proposal_id": "p1", "overall": 4, "recommendation": "accept"},
+        )
+    ]
+    stream = [
+        NS(type="workflow_run.created", id="w0", workflow_run_id="run1"),
+        NS(
+            type="session.thread_created",
+            id="c1",
+            session_thread_id="th1",
+            agent_name="cfp-reviewer",
+            workflow_run_id="run1",
+        ),
+        NS(type="session.thread_status_terminated", id="x1", session_thread_id="th1"),
+        NS(
+            type="workflow_run.status_ended",
+            id="w1",
+            workflow_run_id="run1",
+            result=NS(type="completed"),
+        ),
+        _idle("i1", "end_turn"),
+    ]
+    client = FakeClient(history=[], streams=[stream])
+    asked_for: list[tuple[str, str]] = []
+
+    def thread_events(thread_id: str, *, session_id: str) -> list[NS]:
+        asked_for.append((session_id, thread_id))
+        return reviewer_events
+
+    client.beta.sessions.threads = NS(events=NS(list=thread_events))
+    shown: list[Any] = []
+    result = follow_session(client, "s", on_event=shown.append)  # type: ignore[arg-type]
+    reports = [e for e in shown if e.type == "concierge.thread_finished"]
+    assert asked_for == [("s", "th1")]
+    assert len(reports) == 1 and reports[0].events == reviewer_events
+    assert reports[0].agent_name == "cfp-reviewer" and reports[0].workflow_run_id == "run1"
+    assert result.workflow_runs == {"run1": "completed"}
+
+
+def test_an_advisor_consultation_is_reported_with_its_threads_record() -> None:
+    stream = [
+        NS(
+            type="session.thread_created",
+            id="c1",
+            session_thread_id="adv",
+            agent_name="anthropic.advisor",
+            workflow_run_id=None,
+        ),
+        NS(
+            type="session.thread_status_terminated",
+            id="x1",
+            session_thread_id="adv",
+            agent_name="anthropic.advisor",
+        ),
+        _idle("i1", "end_turn"),
+    ]
+    client = FakeClient(history=[], streams=[stream])
+    record = NS(
+        agent=NS(model="claude-opus-5-5", type="advisor"),
+        stats=NS(duration_seconds=19.8),
+        usage=NS(
+            input_tokens=4,
+            cache_read_input_tokens=0,
+            cache_creation=NS(ephemeral_5m_input_tokens=11442, ephemeral_1h_input_tokens=0),
+            output_tokens=1908,
+            list_cost=NS(amount="10", currency="USD"),
+        ),
+    )
+    asked_for: list[tuple[str, str]] = []
+
+    def retrieve(thread_id: str, *, session_id: str) -> NS:
+        asked_for.append((session_id, thread_id))
+        return record
+
+    client.beta.sessions.threads = NS(retrieve=retrieve)
+    shown: list[Any] = []
+    follow_session(client, "s", on_event=shown.append)  # type: ignore[arg-type]
+    reports = [e for e in shown if e.type == "concierge.advice_given"]
+    assert asked_for == [("s", "adv")]
+    assert reports == [
+        sessions.AdviceGiven(
+            "adv",
+            model="claude-opus-5-5",
+            seconds=19.8,
+            input_tokens=11446,
+            output_tokens=1908,
+            cost_cents=10,
+        )
+    ]

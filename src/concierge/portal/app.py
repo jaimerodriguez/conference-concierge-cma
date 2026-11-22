@@ -23,23 +23,96 @@ from starlette.templating import Jinja2Templates
 from concierge.catalog import Catalog
 from concierge.clients import get_client
 from concierge.config import Settings
-from concierge.proposals import ProposalOutcome, submit_proposal
+from concierge.moderation import MAX_ABSTRACT_CHARS, MAX_TITLE_CHARS, suggestion_sentence
+from concierge.proposals import (
+    MAX_EMAIL_CHARS,
+    MIN_ABSTRACT_CHARS,
+    ProposalOutcome,
+    check_submission,
+    submit_proposal,
+)
 from concierge.services.store import Store
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
-MAX_NAME_CHARS = 40
+
+def mask_email(address: str) -> str:
+    """Hide most of an address for the public board.
+
+    "ada.lovelace@example.com" becomes "ad***e@example.com".
+
+    The first two letters and the last letter of the part before the @ stay; the mask is a fixed
+    width so it does not give away the length. Prefixes of three letters or fewer keep only
+    their first letter, so nothing short is shown in full.
+    """
+    local, at, domain = address.rpartition("@")
+    if not at:
+        return "***"
+    shown = f"{local[:2]}***{local[-1]}" if len(local) > 3 else f"{local[:1]}***"
+    return f"{shown}@{domain}"
+
+
+TEMPLATES.env.filters["mask_email"] = mask_email
+
 RATE_LIMIT_SUBMISSIONS = 3  # per client address...
 RATE_LIMIT_WINDOW_SECONDS = 10 * 60  # ...per ten minutes
 MAX_CONCURRENT_JOBS = 8
 
+LIMITS = {
+    "email": MAX_EMAIL_CHARS,
+    "title": MAX_TITLE_CHARS,
+    "abstract": MAX_ABSTRACT_CHARS,
+    "abstract_min": MIN_ABSTRACT_CHARS,
+}
+
+
+@dataclass(frozen=True)
+class BoardGroup:
+    """One section of the proposal board and the statuses it collects."""
+
+    key: str
+    label: str
+    statuses: frozenset[str]
+    blurb: str
+
+
+# Waitlisted proposals were reviewed and are still in the running, so they sit with "Reviewed".
+# Proposals not reviewed yet get their own section, so a fresh submission is always visible.
+BOARD_GROUPS = (
+    BoardGroup("accepted", "Accepted", frozenset({"accepted"}), "On the agenda."),
+    BoardGroup(
+        "reviewed",
+        "Reviewed",
+        frozenset({"reviewed", "waitlisted"}),
+        "Scored by the CFP Reviewer, waiting for the organizers' decision.",
+    ),
+    BoardGroup("declined", "Not this time", frozenset({"declined"}), "Thank you for proposing!"),
+    BoardGroup(
+        "submitted",
+        "Awaiting review",
+        frozenset({"submitted"}),
+        "The Program Chair reviews new proposals every morning.",
+    ),
+)
+
+NEXT_STEPS = {
+    "accepted": "You're on the agenda. Watch for your time slot and the sponsor perk code.",
+    "reviewed": "Reviewed. The organizers decide soon.",
+    "waitlisted": "On the waitlist. We'll reach out if a slot opens up.",
+    "declined": "Not this time. We'd love a new proposal for the next meetup.",
+    "submitted": "Waiting for the morning review.",
+}
+
 
 @dataclass
 class Job:
-    topic: str
+    title: str
+    writes_abstract: bool = True
     outcome: ProposalOutcome | None = None
     error: str | None = None
     started_at: float = field(default_factory=time.time)
+    # What the person typed, so a rejected submission goes back to a filled-in form.
+    form: dict[str, Any] = field(default_factory=dict)
 
 
 def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[BaseRoute]:
@@ -66,39 +139,59 @@ def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[Bas
                     submit_proposal,
                     get_client(),
                     store,
-                    member_name=form["name"],
+                    contact_email=form["contact_email"],
                     persona_id=form["persona"],
                     track_id=form["track"],
-                    topic=form["topic"],
+                    title=form["title"],
+                    abstract=None if form["ai_abstract"] else form["abstract"],
                     settings=settings,
                 )
             except Exception as error:
                 job.error = f"{type(error).__name__}: {error}"
 
-    def form_context(error: str | None = None) -> dict[str, Any]:
-        return {"catalog": catalog, "error": error}
+    def form_context(
+        error: str | None = None, values: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        # `values` refills the form after an error, so nobody retypes an abstract.
+        return {
+            "catalog": catalog,
+            "error": error,
+            "values": values or {"ai_abstract": True},
+            "limits": LIMITS,
+        }
+
+    def validate(form: dict[str, Any]) -> str | None:
+        """The first problem with a submission, or None. `concierge propose` runs the same."""
+        return check_submission(
+            catalog,
+            contact_email=form["contact_email"],
+            title=form["title"],
+            track_id=form["track"],
+            persona_id=form["persona"],
+            abstract=None if form["ai_abstract"] else form["abstract"],
+        )
 
     async def index(request: Request) -> Response:
         return TEMPLATES.TemplateResponse(request, "form.html", form_context())
 
     async def propose(request: Request) -> Response:
         data = await request.form()
-        custom_topic = str(data.get("custom_topic", "")).strip()
-        form = {
-            "name": str(data.get("name", "")).strip()[:MAX_NAME_CHARS],
-            "persona": str(data.get("persona", "")),
-            "track": str(data.get("track", "")),
-            "topic": custom_topic or str(data.get("topic", "")),
+
+        def text(key: str) -> str:
+            return str(data.get(key, "")).strip()
+
+        form: dict[str, Any] = {
+            "contact_email": text("contact_email"),
+            "persona": text("persona"),
+            "track": text("track"),
+            # An unchecked checkbox is simply missing from the form data.
+            "ai_abstract": "ai_abstract" in data,
+            "title": text("title"),
+            "abstract": text("abstract"),
         }
-        known_personas = {persona.id for persona in catalog.personas}
-        known_tracks = {track.id for track in catalog.tracks}
-        if form["persona"] not in known_personas or form["track"] not in known_tracks:
+        if problem := validate(form):
             return TEMPLATES.TemplateResponse(
-                request, "form.html", form_context("Pick a persona and a track."), status_code=400
-            )
-        if not form["topic"]:
-            return TEMPLATES.TemplateResponse(
-                request, "form.html", form_context("Pick or type a topic."), status_code=400
+                request, "form.html", form_context(problem, form), status_code=400
             )
         # Behind a tunnel every request comes from the proxy, so prefer the forwarded
         # address. This header can be forged; it is good enough for a demo, not for production.
@@ -108,12 +201,12 @@ def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[Bas
             return TEMPLATES.TemplateResponse(
                 request,
                 "form.html",
-                form_context("That's a lot of talks! Give others a turn and try again soon."),
+                form_context("That's a lot of talks! Give others a turn and try again soon.", form),
                 status_code=429,
             )
 
         job_id = secrets.token_urlsafe(8)
-        jobs[job_id] = Job(topic=form["topic"])
+        jobs[job_id] = Job(title=form["title"], writes_abstract=form["ai_abstract"], form=form)
         task = asyncio.create_task(run_job(jobs[job_id], form))
         tasks.add(task)
         task.add_done_callback(tasks.discard)
@@ -123,12 +216,43 @@ def build_routes(settings: Settings, store: Store, catalog: Catalog) -> list[Bas
         job = jobs.get(request.path_params["job_id"])
         if job is None:
             return RedirectResponse(request.url_for("index"), status_code=303)
-        return TEMPLATES.TemplateResponse(request, "status.html", {"job": job})
+        rejected = job.outcome is not None and not job.outcome.accepted_for_review
+        if job.error or rejected:
+            # Back to the form with everything still filled in, and the reason on top.
+            if job.outcome is not None:
+                message = job.outcome.message
+                if job.outcome.suggestion:
+                    message += " " + suggestion_sentence(job.outcome.suggestion)
+            else:
+                message = "Something went wrong. Please try again in a moment."
+            return TEMPLATES.TemplateResponse(request, "form.html", form_context(message, job.form))
+        return TEMPLATES.TemplateResponse(
+            request, "status.html", {"job": job, "catalog": catalog, "now": time.time()}
+        )
 
     async def board(request: Request) -> Response:
-        proposals = await asyncio.to_thread(store.list_proposals)
+        proposals = await asyncio.to_thread(store.list_board_proposals)
+        track_names = {track.id: track.name for track in catalog.tracks}
+        track = request.query_params.get("track")
+        if track not in track_names:
+            track = None
+        shown = [p for p in proposals if track is None or p["track"] == track]
+        groups = [
+            (group, [p for p in shown if p["status"] in group.statuses]) for group in BOARD_GROUPS
+        ]
         return TEMPLATES.TemplateResponse(
-            request, "board.html", {"proposals": proposals, "catalog": catalog}
+            request,
+            "board.html",
+            {
+                "catalog": catalog,
+                "groups": groups,
+                "total": len(shown),
+                "track_names": track_names,
+                "track_counts": {t: sum(p["track"] == t for p in proposals) for t in track_names},
+                "all_count": len(proposals),
+                "selected_track": track,
+                "next_steps": NEXT_STEPS,
+            },
         )
 
     return [

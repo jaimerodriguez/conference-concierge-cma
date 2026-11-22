@@ -163,7 +163,7 @@ def test_calendar_booking_with_oauth_token_and_refresh(
 
 def test_proposal_review_acceptance_and_perk(client: TestClient, settings: Settings) -> None:
     store = client.app.state.store
-    member = store.add_member("Sam", persona="weekend-hacker")
+    member = store.add_member("sam@example.com", persona="weekend-hacker")
     proposal = store.add_proposal(
         member_id=member["id"],
         event_id="event",
@@ -171,7 +171,7 @@ def test_proposal_review_acceptance_and_perk(client: TestClient, settings: Setti
         format="lightning",
         title="Bunnies",
         abstract="A talk about bunnies.",
-        source="predefined_topic",
+        source="ai_abstract",
     )
     token = settings.eventdb_token
 
@@ -223,6 +223,14 @@ def test_proposal_review_acceptance_and_perk(client: TestClient, settings: Setti
     )
     assert "speaker" in store.get_member(member["id"])["roles"]
 
+    # The accepted lightning talk now counts against the evening's talk time.
+    fit = call_tool(client, "eventdb", token, "check_agenda_fit", {})
+    assert fit["result"]["structuredContent"]["accepted_minutes"] == 5
+    unknown = call_tool(
+        client, "eventdb", token, "check_agenda_fit", {"add_proposal_ids": ["prop_nope"]}
+    )
+    assert unknown["result"]["isError"] is True
+
     assert client.post("/credits/api/codes", json=perk_request).status_code == 401
     first = client.post("/credits/api/codes", json=perk_request, headers=key).json()
     second = client.post("/credits/api/codes", json=perk_request, headers=key).json()
@@ -245,11 +253,86 @@ def test_portal_pages_render(settings: Settings) -> None:
     routes = build_routes(settings, Store(settings.db_path), catalog)
     with TestClient(build_app(settings, catalog=catalog, extra_routes=routes)) as portal:
         form = portal.get("/")
-        assert form.status_code == 200 and "bunnies" in form.text
+        assert form.status_code == 200
+        assert "Submit talk proposal" in form.text and "Let AI generate abstract" in form.text
+        # The form asks, in order: email, title, the AI checkbox (or an abstract), track, persona.
+        order = ['name="contact_email"', 'name="title"', 'name="ai_abstract"', 'name="track"']
+        positions = [form.text.index(field) for field in [*order, 'name="persona"']]
+        assert positions == sorted(positions)
+        assert 'name="topic"' not in form.text and 'name="custom_topic"' not in form.text
         assert portal.get("/board").status_code == 200
-        # A missing persona is rejected before any model call is made.
-        bad = portal.post("/propose", data={"name": "Sam", "persona": "nope", "track": "fun"})
+        good = {"contact_email": "sam@example.com", "persona": "weekend-hacker", "track": "fun"}
+        # Every bad submission below is rejected before any model call is made.
+        ai = {**good, "title": "Mine", "ai_abstract": "on"}
+        bad = portal.post("/propose", data={**ai, "persona": "nope"})
         assert bad.status_code == 400
+        bad_email = portal.post("/propose", data={**ai, "contact_email": "sam@"})
+        assert bad_email.status_code == 400 and "valid contact email" in bad_email.text
+        no_title = portal.post("/propose", data={**ai, "title": " "})
+        assert no_title.status_code == 400 and "title" in no_title.text
+        # Unchecking "Let AI generate abstract" makes the abstract required...
+        no_abstract = portal.post("/propose", data={**good, "title": "Mine"})
+        assert no_abstract.status_code == 400 and "abstract of at least" in no_abstract.text
+        # ...and what was typed comes back, so nobody retypes it.
+        assert 'value="Mine"' in no_abstract.text and 'value="sam@example.com"' in no_abstract.text
+
+
+def test_board_groups_proposals_and_shows_feedback(settings: Settings) -> None:
+    from concierge.catalog import load_catalog
+    from concierge.config import REPO_ROOT
+    from concierge.portal.app import build_routes
+    from concierge.services.app import build_app
+    from concierge.services.store import Store
+
+    catalog = load_catalog(REPO_ROOT / "content")
+    store = Store(settings.db_path)
+    member = store.add_member("ada@example.com")
+    titles = {}
+    for status in ("accepted", "waitlisted", "declined", "submitted"):
+        proposal = store.add_proposal(
+            member_id=member["id"],
+            event_id="e",
+            track="ai-ml",
+            format="talk",
+            title=f"Talk {status}",
+            abstract=f"Abstract for {status}.",
+            source="sample",
+        )
+        if status != "submitted":
+            store.record_review(
+                proposal["id"],
+                scores={"Clarity": 4},
+                overall=4.0,
+                recommendation="accept",
+                summary=f"Feedback for {status}.",
+            )
+            store.set_proposal_status(proposal["id"], status)
+        titles[status] = proposal["id"]
+
+    routes = build_routes(settings, store, catalog)
+    with TestClient(build_app(settings, catalog=catalog, extra_routes=routes)) as portal:
+        page = portal.get("/board").text
+    sections = {
+        key: page.index(f'id="group-{key}"')
+        for key in ("accepted", "reviewed", "declined", "submitted")
+    }
+    position = {status: page.index(f'id="{pid}"') for status, pid in titles.items()}
+    assert sections["accepted"] < position["accepted"] < sections["reviewed"]
+    assert sections["reviewed"] < position["waitlisted"] < sections["declined"]
+    assert sections["declined"] < position["declined"] < sections["submitted"]
+    assert position["submitted"] > sections["submitted"]
+    assert "Not this time" in page and "Abstract for accepted." in page
+    assert "Feedback for declined." in page and "Contact: a***@example.com" in page
+    assert "ada@example.com" not in page  # the board never shows a full address
+
+
+def test_board_masks_contact_emails() -> None:
+    from concierge.portal.app import mask_email
+
+    assert mask_email("ada.lovelace@example.com") == "ad***e@example.com"
+    assert mask_email("juno@example.com") == "ju***o@example.com"
+    assert mask_email("ada@example.com") == "a***@example.com"
+    assert mask_email("not-an-address") == "***"
 
 
 def _initialize(protocol_version: str = "2025-06-18") -> dict[str, object]:
@@ -292,3 +375,84 @@ def test_mcp_failures_are_logged_without_the_token(
         )
     assert "MCP eventdb: POST -> 401 rpc=tools/list" in caplog.text
     assert "secret-value" not in caplog.text
+
+
+def test_a_rejected_proposal_returns_to_a_filled_in_form(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+
+    from concierge.catalog import load_catalog
+    from concierge.config import REPO_ROOT
+    from concierge.portal import app as portal_app
+    from concierge.proposals import ProposalOutcome
+    from concierge.services.app import build_app
+    from concierge.services.store import Store
+
+    def reject(*args: object, **kwargs: object) -> ProposalOutcome:
+        return ProposalOutcome(
+            accepted_for_review=False, message="Please keep it friendly.", suggestion="Houseplants"
+        )
+
+    monkeypatch.setattr(portal_app, "submit_proposal", reject)
+    monkeypatch.setattr(portal_app, "get_client", lambda: None)
+    catalog = load_catalog(REPO_ROOT / "content")
+    routes = portal_app.build_routes(settings, Store(settings.db_path), catalog)
+    typed = {
+        "contact_email": "sam@example.com",
+        "title": "My Talk Title",
+        "abstract": "A hand-written abstract that is long enough to pass the length check.",
+        "track": "community",
+        "persona": "data-engineer",
+    }
+    with TestClient(build_app(settings, catalog=catalog, extra_routes=routes)) as portal:
+        submitted = portal.post("/propose", data=typed, follow_redirects=False)
+        assert submitted.status_code == 303
+        for _ in range(50):  # the job runs in the background
+            page = portal.get(submitted.headers["location"]).text
+            if "Please keep it friendly." in page:
+                break
+            time.sleep(0.05)
+    assert "Please keep it friendly. You could resubmit with a title like: Houseplants." in page
+    assert 'value="My Talk Title"' in page and 'value="sam@example.com"' in page
+    assert typed["abstract"] in page
+    assert 'value="community" selected' in page and 'value="data-engineer" selected' in page
+    assert 'name="ai_abstract" id="ai_abstract" value="on">' in page  # still unchecked
+
+
+def test_oauth_use_is_logged_without_any_token(
+    client: TestClient, settings: Settings, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Guide 07 tells students to look for these lines in the `concierge serve` output.
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
+        tokens = sign_in(client, settings)
+        call_tool(
+            client,
+            "calendar",
+            tokens["access_token"],
+            "create_event",
+            {
+                "title": "Opening talk",
+                "room": "Main Hall",
+                "starts_at": "2026-12-10T18:30",
+                "ends_at": "2026-12-10T18:55",
+            },
+        )
+        renewed = client.post(
+            "/oauth/token",
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": tokens["refresh_token"],
+                "client_id": OAUTH_CLIENT_ID,
+            },
+        ).json()
+    assert "========== OAUTH ========== SIGN-IN: issued tokens for organizer" in caplog.text
+    assert (
+        "========== OAUTH ========== MCP CALL: Calendar MCP create_event authorized by the "
+        "OAuth access token for organizer: booking 'Opening talk' in Main Hall at "
+        "2026-12-10T18:30"
+    ) in caplog.text
+    assert "========== OAUTH ========== REFRESH: new access token for organizer" in caplog.text
+    for secret in (*tokens.values(), renewed["access_token"], renewed["refresh_token"]):
+        if len(str(secret)) > 20:
+            assert str(secret) not in caplog.text

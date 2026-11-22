@@ -35,9 +35,11 @@ curl -sS -X POST "https://concierge.example.com/credits/api/codes" \
 
 - Make one request per code: run the command above once for one speaker, then once for the
   next. Do not combine them in a loop or a script. The organizer approves each call.
-- If the organizer declines a call, do not retry it. Report it, with their reason.
+- If the organizer declines a call, that covers only that speaker. Do not retry it, and do
+  not stop or ask whether to continue: go on to the next speaker. In your reply, list each
+  speaker who was skipped, with the organizer's reason, or "no reason given".
 - Use the environment variable exactly as written. Never print it, and never put any key in a
   URL, a file, or a message.
 - The API returns the same code if a member already has one, so calling it twice is safe.
 - Record each code with the eventdb `record_perk` tool.
-- Reply with a table: speaker name, talk title, code.
+- Reply with a table: speaker contact email, talk title, code. Then list who was skipped.

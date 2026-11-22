@@ -9,7 +9,8 @@ from rich.console import Console
 from typer.testing import CliRunner
 
 from concierge import cli
-from concierge.progress import Progress, describe_tool
+from concierge.progress import Progress, describe_tool, pretty_model
+from concierge.sessions import AdviceGiven
 
 
 def _render(events: list[NS], **kwargs: object) -> str:
@@ -34,6 +35,12 @@ def test_tool_calls_are_described_in_plain_language() -> None:
     )
     assert describe_tool("calendar", "create_event", {"title": "Talk", "room": "A"}) == (
         "booking Talk in A"
+    )
+    assert describe_tool("eventdb", "check_agenda_fit", {"add_proposal_ids": ["a", "b"]}) == (
+        "checking whether 2 more proposals fit in the evening"
+    )
+    assert describe_tool("eventdb", "check_agenda_fit", {}) == (
+        "checking that the accepted proposals fit in the evening"
     )
     assert describe_tool(None, "bash", {}) is None  # generic sandbox tools collapse
     assert describe_tool("other", "thing", {}) == "using other.thing"
@@ -359,14 +366,45 @@ def test_a_call_waiting_for_approval_is_not_also_a_progress_line() -> None:
     assert "[Scheduler] checking what is already on the calendar" in text  # name from status
 
 
-def test_the_advisors_private_reply_is_explained() -> None:
-    reply = NS(
+def test_an_advisor_consultation_shows_when_and_what_it_cost() -> None:
+    created = NS(
+        type="session.thread_created",
+        session_thread_id="t3",
+        agent_name="anthropic.advisor",
+        workflow_run_id=None,
+    )
+    reply = NS(  # the advice itself is redacted on the stream
         type="agent.thread_message_received",
         from_agent_name="anthropic.advisor",
         from_session_thread_id="t3",
-        content=[],
+        content=[NS(type="redacted")],
     )
-    assert "[Advisor] advised the Program Chair (the advice is private)" in _render([reply])
+    done = AdviceGiven(
+        "t3",
+        model="claude-opus-5-5",
+        seconds=19.8,
+        input_tokens=11446,
+        output_tokens=1908,
+        cost_cents=10,
+    )
+    text = _render([created, reply, done])
+    assert "[Program Chair] consulting its advisor" in text
+    assert "[Advisor] advised the Program Chair (Opus 5.5, 20 s, $0.10)" in text
+    assert "goes only to the Program Chair" in text
+    assert "11,446" not in text and "redacted" not in text  # token counts are for --verbose
+    verbose = _render([created, reply, done], verbose=True)
+    assert "read 11,446 tokens of the Program Chair's conversation" in verbose
+    assert "[agent.thread_message_received, redacted]" in verbose
+
+
+def test_an_unreadable_advisor_record_still_gets_a_line() -> None:
+    text = _render([AdviceGiven("t3")])
+    assert "[Advisor] advised the Program Chair. The advice goes only to" in text
+
+
+def test_model_ids_read_as_names() -> None:
+    assert pretty_model("claude-opus-5-5") == "Opus 5.5"
+    assert pretty_model("claude-sonnet-4-5-20250929") == "Sonnet 4.5"
 
 
 def test_agenda_shows_one_line_while_working_and_the_last_message_in_full(
@@ -390,9 +428,9 @@ _PERK = (
 def test_a_perk_code_call_is_asked_in_plain_words() -> None:
     from concierge.progress import describe_approval
 
-    names = {"mem_1": "Priya"}.get
-    assert describe_approval(None, "bash", {"command": _PERK}, names) == (
-        "Issue a CloudCredits perk code ($50) for Priya (mem_1)?"
+    emails = {"mem_1": "priya@example.com"}.get
+    assert describe_approval(None, "bash", {"command": _PERK}, emails) == (
+        "Issue a CloudCredits perk code ($50) for priya@example.com (mem_1)?"
     )
     loop = (
         'for m in mem_1 mem_2; do curl "https://x/credits/api/codes"'
@@ -406,7 +444,7 @@ def test_a_covers_the_remaining_perk_codes_but_never_other_commands(
 ) -> None:
     console = Console(record=True, width=200, force_terminal=False)
     monkeypatch.setattr(cli, "console", console)
-    monkeypatch.setattr(cli, "_member_name", lambda member_id: None)
+    monkeypatch.setattr(cli, "_member_email", lambda member_id: None)
     answers = iter(["a", "n", ""])
     monkeypatch.setattr(cli.typer, "prompt", lambda text, **kw: next(answers))
     approve = cli._AskPerson()
@@ -420,3 +458,68 @@ def test_a_covers_the_remaining_perk_codes_but_never_other_commands(
     text = console.export_text()
     assert "Approved (you said yes to all): Issue a CloudCredits perk code ($50) for mem_2" in text
     assert "Run this command? rm -rf /tmp/x" in text and "X-Api-Key" not in text
+
+
+def test_a_workflow_run_shows_each_reviewer_working_in_parallel() -> None:
+    from concierge.sessions import ThreadFinished
+
+    def created(thread: str) -> NS:
+        return NS(
+            type="session.thread_created",
+            session_thread_id=thread,
+            agent_name="cfp-reviewer",
+            workflow_run_id="run1",
+        )
+
+    def running(thread: str) -> NS:
+        return NS(
+            type="session.thread_status_running",
+            session_thread_id=thread,
+            agent_name="cfp-reviewer",
+        )
+
+    def finished(thread: str, proposal: str, score: float) -> ThreadFinished:
+        saved = NS(
+            type="agent.mcp_tool_use",
+            mcp_server_name="eventdb",
+            name="record_review",
+            input={"proposal_id": proposal, "overall": score, "recommendation": "waitlist"},
+        )
+        return ThreadFinished(thread, "cfp-reviewer", "run1", [saved])
+
+    events = [
+        NS(
+            type="workflow_run.created",
+            name="Daily proposal review",
+            description="One reviewer per proposal, in parallel.",
+            phases=[NS(id="ph1", name="Review")],
+        ),
+        NS(type="workflow_run.phase_started", workflow_run_phase_id="ph1"),
+        created("a"),
+        created("b"),
+        running("a"),
+        running("b"),
+        finished("b", "p2", 3.6),
+        finished("a", "p1", 2.4),
+        NS(type="workflow_run.status_ended", workflow_run_id="run1", result=NS(type="completed")),
+        NS(
+            type="agent.mcp_tool_use",
+            mcp_server_name="eventdb",
+            name="get_proposal",
+            input={"proposal_id": "p1"},
+            session_thread_id=None,
+        ),
+    ]
+    text = _render(events)
+    assert "starting a workflow run (Daily proposal review): One reviewer" in text
+    assert "[Workflow run] phase started: Review" in text
+    assert "[CFP Reviewer 2] started (2 running at once)" in text
+    assert (
+        "[CFP Reviewer 2] finished, saved the review for p2 (score 3.6, waitlist); 1 still" in text
+    )
+    assert (
+        "[CFP Reviewer 1] finished, saved the review for p1 (score 2.4, waitlist); the last" in text
+    )
+    assert "the workflow run ended: completed (2 agent threads)" in text
+    assert "[Program Chair] reading the review CFP Reviewer 1 saved for p1" in text
+    assert "bringing in" not in text  # thread creation is for --verbose

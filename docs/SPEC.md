@@ -28,15 +28,17 @@ Non-goals: a production event platform, real email delivery, a real calendar pro
 
 The "AI Meetup" runs a monthly event. Before each event:
 
-1. **Members propose talks.** Anyone at the event can open the portal on their phone, pick a
-   persona and a topic (or type their own), pick a track, and get a generated abstract
-   submitted as a proposal.
+1. **Members propose talks.** Anyone at the event can open the portal on their phone, enter a
+   contact email and a talk title, and either let an agent write the abstract (in the voice of
+   a persona they pick) or write their own. They also pick a track. The proposal board groups
+   every proposal as Accepted, Reviewed, Not this time, or Awaiting review.
 2. **Every morning, the Program Chair reviews new proposals.** A scheduled run fans out the
    new proposals to CFP Reviewers, who score each against the base rubric plus its track
    rubric. The chair writes a digest.
-3. **The organizer accepts talks and the chair builds the agenda.** The chair delegates slot
-   planning to the Scheduler, consults its advisor about topic and speaker balance, and
-   pauses for the organizer's approval before booking calendar slots.
+3. **The organizer accepts talks and the chair builds the agenda.** The chair checks that the
+   talks fit in the evening (accepting only those that do), consults its advisor about topic
+   and speaker balance before anything is booked, then delegates slot planning to the
+   Scheduler, which pauses for the organizer's approval before booking calendar slots.
 4. **Accepted speakers get a perk.** The Speaker Liaison issues each accepted speaker a
    "CloudCredits" sponsor code through an API whose key lives in a vault.
 5. **Attendees ask questions.** The Attendee Helper answers "Where do I park?" or "Is there
@@ -66,7 +68,7 @@ This gives the demo its arc: an audience member becomes a speaker, live.
 | `id`, `member_id`, `event_id` | |
 | `track` | One of the configured tracks (§3.3) |
 | `title`, `abstract`, `format` | `format`: talk (25 min) or lightning (5 min) |
-| `source` | `predefined_topic`, `custom_topic` (passed moderation), or `typed` |
+| `source` | `ai_abstract` (the Abstract Writer wrote it), `manual_abstract` (the person did), or `sample` |
 | `status` | `submitted` → `reviewed` → `accepted` / `waitlisted` / `declined` |
 | `scores` | Per-criterion scores written by the CFP Reviewer |
 
@@ -77,7 +79,7 @@ A rubric is a **shared base plus a per-track add-on**, both markdown files in
 
 | File | Criteria |
 |---|---|
-| `base.md` | Clarity, originality, fits the time slot, audience takeaway, abstract length |
+| `base.md` | Clarity (title and abstract describe the same talk), originality, fits the time slot, audience takeaway, abstract length, respectful |
 | `tracks/ai-ml.md` | Technical depth, demo or evidence, reproducibility |
 | `tracks/community.md` | Inclusiveness, actionable for organizers, story |
 | `tracks/lightning.md` | One idea, fits 5 minutes, memorable hook |
@@ -95,11 +97,14 @@ Each venue is a markdown profile in `content/venues/` (address, parking, transit
 accessibility, food, rooms, AV). An event points at one venue. Two sample venues ship so the
 demo can show switching venues: a tech office and a public library.
 
-### 3.5 Personas and topics
+### 3.5 Personas and sample proposals
 
-`content/personas.yaml` and `content/topics.yaml` hold predefined entries for the portal
-("Weekend hacker", "Data engineer", "Community organizer"…; "bunnies", "sourdough",
-"retro games"…). Predefined entries skip moderation.
+`content/personas.yaml` holds the portal's personas ("Weekend hacker", "Data engineer",
+"Community organizer"…). `content/sample_proposals.yaml` holds the AI-centered proposals
+`concierge data sample` adds: five solid ones and five problem cases the review should catch
+(a title that does not match its abstract, inappropriate content, a prompt injection, a sales
+pitch, a workshop in a lightning slot), ten at most. The portal does not offer topics: the
+person's title is what the agent writes about.
 
 ---
 
@@ -124,7 +129,7 @@ demo can show switching venues: a tech office and a public library.
          /credits/api  CloudCredits sponsor API (API key header)
          SQLite storage
 
- Local: OpenTelemetry Collector + Jaeger (docker compose); `concierge` CLI (Typer).
+ Local: Jaeger, which accepts OTLP directly (docker compose); `concierge` CLI (Typer).
 ```
 
 Why one services app: a single public tunnel URL (for example `cloudflared` or `ngrok`) keeps the
@@ -143,9 +148,9 @@ where noted.
 | **Scheduler** | Sonnet 5.5 | ant | Plans slots, books calendar events as the organizer | Calendar MCP (OAuth, `always_ask` on create); Event DB MCP |
 | **Speaker Liaison** | Haiku 5.5 | ant | Issues CloudCredits perk codes, drafts welcome notes | bash (curl with vault env var); Event DB MCP |
 | **Attendee Helper** | Haiku 5.5 | ant | Answers attendee questions | venues memory (read-only), ops-notes (read-only) |
-| **Abstract Writer** | Haiku 5.5 base | ant (base) + **on-the-fly overrides** per request | Turns persona + topic + track into a title and abstract | agent toolset (write only) |
+| **Abstract Writer** | Haiku 5.5 base | ant (base) + **on-the-fly overrides** per request | Writes an abstract for the person's title, persona, and track | agent toolset (write only) |
 | **Speaker Bio Writer** | Haiku 5.5 | **created at runtime** with `agents.create` (guarded, created once) | Writes a short bio for an accepted speaker | none beyond write |
-| **Moderator** | Haiku 5.5 | *Not an agent.* One Messages API call with structured output | Allows or rejects a typed topic | n/a |
+| **Moderator** | Haiku 5.5 | *Not an agent.* One Messages API call with structured output | Allows or rejects a typed title, or a title and abstract | n/a |
 
 The Moderator is deliberately a single API call: a teaching point that not every step needs an
 agent.
@@ -183,7 +188,7 @@ read-only), which also blocks memory poisoning from the public.
 | 3 | System-level memory | Three workspace-scoped stores (§4.3) |
 | 4 | OpenTelemetry | SDK tracing in the CLI and portal to Jaeger; API tracing destination (guide only, needs an org admin) |
 | 5 | Scheduling | Deployment `daily-review`, 08:00 local, plus `deployments.run` to fire it on stage |
-| 6a | Multi-agent: advisor | Program Chair consults Opus 5.5 before publishing the agenda |
+| 6a | Multi-agent: advisor | Program Chair consults Opus 5.5 before the agenda is booked |
 | 6b | Multi-agent: workflow | Program Chair starts a dynamic workflow run that reviews N proposals in parallel with CFP Reviewers; plus the fixed roster for delegation |
 | 7 | MCP with OAuth from the client | `concierge auth calendar` runs the OAuth sign-in and stores tokens in the vault |
 
@@ -199,20 +204,25 @@ read-only), which also blocks memory poisoning from the public.
 
 ### 5.2 Safety for audience input
 
-1. Predefined personas and topics skip moderation.
-2. Typed topics go to the Moderator (Haiku 5.5, structured output: `allowed`, `reason`,
+1. Personas and tracks are picked from lists, so they need no check.
+2. Every typed title goes to the Moderator (Haiku 5.5, structured output: `allowed`, `reason`,
    `suggestion`). Rejects sexual, violent, hateful or harassing content, real private people,
-   and anything not respectful. Rejection shows a friendly "try another topic" with a suggestion.
+   and anything not respectful. Rejection shows a friendly "try something else" with a suggestion,
+   phrased as a statement ("You could resubmit with a title like: …"), never a question.
+   A title and abstract a person writes themselves go through the same check, with the same
+   house rule, before they are saved.
 3. The Abstract Writer's prompt repeats the content rules (defense in depth).
 4. Session budgets cap spend per submission; the portal rate-limits per IP.
 
 ### 5.3 Key flows
 
 **Propose a talk (on-the-fly agent + outcome).**
-Portal → moderation (if typed) → `sessions.create` with `agent_with_overrides` (system prompt
+Portal → moderation of the title → `sessions.create` with `agent_with_overrides` (system prompt
 built from persona + track, `budget`) and `initial_events: [user.define_outcome]` whose rubric is
 base + track template → stream until idle → read `abstract.json` from the session → save the
-proposal through the services API.
+proposal through the services API. When the person writes their own abstract, the portal
+moderates the title and abstract and saves them as they are (source `manual_abstract`); no
+session runs.
 
 **Daily review (scheduled + workflow + outcome).**
 Deployment fires at 08:00 → Program Chair lists new proposals (Event DB MCP) → workflow run with
@@ -220,10 +230,12 @@ CFP Reviewers → reviewers write scores (Event DB MCP) → chair writes `digest
 outcome rubric → organizer reads the digest.
 
 **Build the agenda (roster + advisor + approval).**
-Organizer: "Accept the top 6 and build the agenda" → chair delegates slot planning to the
-Scheduler → consults advisor on balance → Scheduler proposes calendar events → each
-`create_event` pauses for approval in the CLI → Speaker Liaison issues perk codes (vault env var;
-each call pauses for approval too).
+Organizer: "Accept the top 6 and build the agenda" → chair checks the fit with the Event DB
+`check_agenda_fit` tool (everything already accepted, plus breaks and the end buffer) and
+accepts only what fits → consults advisor on balance and running order → delegates slot
+planning to the Scheduler → Scheduler proposes calendar events → each `create_event` pauses
+for approval in the CLI → Speaker Liaison issues perk codes (vault env var; each call pauses
+for approval too, and a declined code skips only that speaker).
 
 **Write a speaker bio (runtime-created agent).** `concierge bio "<name>" "<facts>"` → the Bio
 Writer, created once at runtime with `agents.create`, writes a short bio. This is a separate
@@ -313,7 +325,7 @@ conference-concierge/
 │   ├── memory_stores/*.yaml
 │   ├── vaults/concierge.yaml
 │   └── deployments/daily-review.yaml
-├── content/                  # venues, rubrics, personas, topics, seed notes
+├── content/                  # venues, rubrics, personas, sample proposals, seed notes
 ├── src/concierge/
 │   ├── cli.py                # `concierge` Typer app
 │   ├── config.py, managed.py # settings; IDs from claude-lock.json
@@ -322,7 +334,7 @@ conference-concierge/
 │   ├── sessions.py           # event loop: streaming, approvals, custom tools
 │   ├── moderation.py, abstracts.py, bios.py, review.py, attendee.py
 │   ├── memory.py, vaults.py, oauth_client.py
-│   ├── portal/               # Starlette proposal form, served by `concierge serve`
+│   ├── portal/               # Starlette proposal form and board, served by `concierge serve`
 │   └── services/             # OAuth server, Calendar MCP, Event DB MCP, CloudCredits API
 ├── phase2/
 │   ├── a-self-hosted-sandbox/
@@ -370,7 +382,7 @@ names the file and the `Step N` marker to search for. In code, markers look like
 ## 9. Demo script (about 20 minutes)
 
 1. The setup: show `managed/`, run `ant apply --dry-run`, then apply. (Guide 01)
-2. Audience submits talks from phones; one typed topic gets moderated. (03, 11, 13)
+2. Audience submits talks from phones; each typed title gets moderated. (03, 11, 13)
 3. Fire the daily review manually; watch the workflow run fan out in the Console. (08, 10)
 4. Accept talks; build the agenda; advisor consult; approve calendar bookings live. (09, 12, 07)
 5. Speaker Liaison issues a perk; show the placeholder for `$CLOUDCREDITS_API_KEY`. (06)

@@ -5,6 +5,218 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2026-11-21
+
+#### Added
+- `concierge setup public` puts the sample values back in the resource files so they are
+  safe to commit to a public repo: your tunnel host becomes `concierge.example.com` again
+  and the deployment's `vault_ids` becomes `[]`, in `managed/` and
+  `phase2/b-self-hosted-service/`. `--check` only lists the files that still hold your
+  values and exits 1 if any do. `setup host` and `setup deployment` restore your values
+  afterwards. The logic lives in `src/concierge/publish.py`; README "Publishing your copy"
+  has the steps.
+
+- `concierge propose --abstract TEXT` and `--abstract-file PATH` (`-` reads stdin) submit
+  your own abstract, like unchecking "Let AI generate abstract for me" in the portal. With
+  neither, the Abstract Writer writes it, as before. Title and abstract are moderated
+  together and no agent session runs.
+
+- `concierge data sample` adds a fixed set of ten proposals from the new
+  `content/sample_proposals.yaml`: five solid, AI-centered proposals with 60-120 word
+  abstracts, then five problem cases the review should catch (a title that does not match
+  its abstract, inappropriate content, a prompt injection, a sales pitch, a workshop in a
+  lightning slot). The output's Case column says which is which; it is never saved, so
+  reviewers judge the text alone. Offline, every proposal is saved as written, so the
+  inappropriate one reaches the reviewers ("Respectful" declines it). With `--generate`, the
+  accurate ones get Abstract Writer abstracts and the problem cases go through moderation,
+  which stops the inappropriate one and the injection.
+
+- Event DB `check_agenda_fit` tool (`src/concierge/agenda.py`): counts every accepted
+  proposal against the evening's talk time after breaks (one per full hour after the first)
+  and the end buffer, and says which extra proposals fit, taken in the order given. The
+  arithmetic is code, not prompt, so the chair and the Scheduler read the same numbers.
+  `content/event.yaml` gains `slots.buffer_minutes` (default 10). Live output shows it as
+  "checking whether 4 more proposals fit in the evening".
+
+- `review run` shows the delegation inside a workflow run: the run's plan and phase, a line
+  as each CFP Reviewer starts (numbered, with how many run at once) and a line as each
+  finishes, with the score and recommendation it saved. The chair's reads after the run are
+  labelled as reading the reviews the reviewers saved. A run thread's tool calls are not on
+  the session stream, so `follow_session` lists each run thread's own events when it ends
+  and passes them on as a `ThreadFinished` report. `--verbose` adds each reviewer's tool
+  calls.
+- Guide 08: Step 6 (seeing inside a workflow run), sample output with how to read it, and
+  what to look for in the Console session viewer (thread lanes, Threads tab, a reviewer's
+  transcript). `docs/CLI.md` regenerated.
+
+- `agenda build` shows the advisor consultation in two lines: "[Program Chair] consulting
+  its advisor ..." when the platform starts the advisor's thread, and "[Advisor] advised the
+  Program Chair (Opus 5.5, 20 s, $0.10) ..." when it ends, with the model, duration and cost
+  read from the advisor thread's record (`sessions.threads.retrieve`), since the advice
+  itself arrives redacted. `--verbose` adds the tokens the advisor read and wrote. The new
+  `AdviceGiven` report is made in `follow_session` (marker `Guide 09 · Step 3`).
+- Guide 09: Step 3 (seeing the consultation), how a consultation works, sample output with
+  how to read it, what to look for in the Console, and a note that the prompt's "when"
+  decides whether the advice can still change the bookings. `docs/CLI.md` regenerated.
+
+#### Fixed
+- With `OTEL_EXPORTER_OTLP_ENDPOINT` set but nothing listening there (Jaeger not started),
+  every command ended with three `Transient error ... Connection refused` lines, a
+  `Failed to export spans batch` line, and about six seconds of waiting. Tracing now checks
+  the endpoint once at start; if nothing answers, it prints one line saying tracing is off
+  for this run (start Jaeger or unset the variable, Guide 05) and the command runs without
+  it. `concierge doctor` adds a tracing line: off, collector answers, or nothing answers.
+  It never fails the check, since tracing is optional. `OTEL_SDK_DISABLED=true` also turns
+  tracing off.
+- `concierge serve` traced as `concierge-cli` instead of `concierge-portal`: the CLI's
+  start-up hook registered the provider first. Guide 05 also named the command
+  `concierge services`; it is `concierge serve`.
+- `--verbose` raw tool names such as `[eventdb.list_proposals]` were swallowed by Rich as
+  markup and never printed; progress lines are now escaped.
+- `agenda build`: a reply to the Program Chair now shows the chair's answer. Before, the CLI
+  read the session history after sending the reply, took the idle event that ended the
+  previous turn as the end of the new one, and returned at once, so each reply was sent and
+  answered but the answer was never shown and the prompt repeated.
+
+#### Changed
+- The Attendee Helper (`concierge ask`) ends each answer with a statement, never a question
+  or an offer of more help: the attendee gets one answer and cannot reply. Edited in
+  `managed/agents/attendee-helper/agent.md` and regenerated into the phase 2 copy; takes
+  effect after `ant apply` from `managed/`.
+- A moderation rejection no longer ends in a question. `concierge propose` and the portal
+  used to print "How about: <suggestion>?", which invited a reply nobody could send (both
+  answer once) and could end in ".?". They now say "You could resubmit with a title like:
+  <suggestion>." (`suggestion_sentence` in `src/concierge/moderation.py`, which drops the
+  model's ending punctuation). Both moderation prompts now ask for the alternative as a
+  plain title and for the reason as a statement, never a question.
+- The portal and `concierge propose` share one set of free checks before any model call
+  (`check_submission` in `src/concierge/proposals.py`): email, title length, abstract length
+  (50 to 1500 characters), track and persona. The CLI used to skip them, so an unknown
+  persona or track crashed with a stack trace; it now prints the portal's message (which
+  lists the valid ids) and exits 1. `propose` also exits 1 when moderation rejects the
+  proposal. `--persona` help notes it only shapes AI-written abstracts.
+
+- Program Chair: consults its advisor before it asks the Scheduler to book, on the proposed
+  acceptances and running order, instead of after the bookings, so the advice can change the
+  plan. Guide 09 (intro, how a consultation works, sample output from a live run, what to
+  notice), SPEC and the phase 2b rewrite in `make_managed.py` match.
+- Program Chair: before accepting, calls `check_agenda_fit` with the proposals it means to
+  accept; accepts only those that fit and names the rest for the organizer. An earlier run
+  accepted four on top of eight already accepted: 160 minutes of talks in a 150-minute
+  window, ending 21:20. The Scheduler checks again before booking and books nothing if the
+  accepted proposals already overrun, unless the organizer has accepted the overrun.
+- Speaker Liaison: a declined perk code skips only that speaker; it carries on with the rest
+  and lists who was skipped and why. The chair treats a declined booking or code the same
+  way. Approval for each code is unchanged.
+- `agenda build`: declining without a reason now tells the agent that only this one call was
+  declined and to carry on (`DECLINED_WITHOUT_REASON`), instead of a bare "The organizer
+  declined this call." Guide 12 matches.
+- `agenda build`: the line "[Advisor] advised the Program Chair (the advice is private)" is
+  replaced by the two lines above; the redacted advice event alone prints only under
+  `--verbose`.
+- `agenda build`: the reply prompt says the run is complete, that a reply is optional, and
+  what it is for. Guide 12 matches.
+- `concierge serve` logs OAuth use without token values, each line under a bold
+  `========== OAUTH ==========` marker: `SIGN-IN` (tokens issued), `MCP CALL` (each Calendar
+  MCP tool call made with the organizer's access token), `REFRESH` (made by Anthropic for the
+  vault) and `REFUSED`.
+- Guide 07: *Try it* has a "What to look for in the `concierge serve` log" section with the
+  marker, how to grep for it, a table of the three kinds of line and sample lines; *What to
+  notice* explains what those lines prove.
+- `data sample` defaults to 10 proposals and allows at most 10; `--count N` takes the first
+  N (accurate ones first). Docs updated: README, SPEC, Guides 08 and 13, `docs/CLI.md`.
+- Base rubric: Clarity now requires the title and abstract to describe the same talk (a
+  mismatch scores 1). Takes effect after `concierge setup memory` re-seeds the rubrics store.
+- CFP Reviewer: a proposal that tries to instruct its reviewers scores "Respectful" 1 (so it
+  is declined) and the summary says so. Takes effect after `ant apply` from `managed/`.
+  Phase 2b agent files regenerated.
+
+#### Removed
+- `data sample --seed` (the set is fixed now), the template-built titles and abstracts, and
+  `content/topics.yaml` with `Catalog.topics`, which only `data sample` used.
+
+### 2026-11-20
+
+#### Changed
+- Guide 05 (OpenTelemetry): explains OpenTelemetry, OTLP, and Jaeger for newcomers; adds a
+  settings table (environment variables, service names) and a ports table (16686, 4318);
+  rewrites Step 6 to say what API tracing adds, how an admin turns it on, why the local
+  Jaeger cannot receive it, and how the two halves join into one trace; updates *Try it* to
+  the title-based `propose` command.
+- Guide 05: a *Content mode* section (what `metadata_only` and `content` show in Jaeger,
+  where to change it, and the privacy caution) and a *Try it* step for switching to `content`.
+- Guide 06 (vault): *What to notice* rewritten to explain the `cma_ph_` placeholder, where the
+  proxy swaps it (`allowed_hosts`, `injection_location`), why it only works in Anthropic's
+  cloud sandbox, and how to remove stale credentials with `setup vault --remove-stale`.
+- Guide 04: notes that `ant beta:memory-stores list` browses the memory store.
+- Guide 05: clarifies the `propose` example in *Try it*.
+- README: says what the demo was built for, adds an AI-generated disclaimer with links to
+  report issues or open a PR, and retitles the flow section.
+- Abstract rubric: the abstract must describe an educational user-group session related to
+  the title.
+- Managed resources: the placeholder host `concierge.example.com` is replaced with the
+  demo's tunnel host (`setup host`), and `daily-review.yaml` lists the demo vault ID.
+
+#### Fixed
+- A Managed Agents session's title now keeps up to 120 characters of the talk title
+  (`MAX_TITLE_CHARS`, the portal's limit) instead of cutting it at 60.
+- `docs/SPEC.md` and `telemetry.py` no longer mention an OpenTelemetry Collector; the demo
+  sends spans straight to Jaeger.
+- `OTEL_EXPORTER_OTLP_ENDPOINT` (and any other `OTEL_*` variable) set in `.env` was ignored,
+  so tracing stayed off. `setup_telemetry` now copies `OTEL_*` variables from `.env` into the
+  environment (`load_otel_env`); a value exported in the shell still wins. Guide 05 and
+  `.env.example` recommend `.env` again. `python-dotenv` is now a direct dependency.
+
+#### Added
+- Docs: flow visuals in `docs/images/`: who does the work (README), the guide map (README and
+  guides index), and an all-in-one journey for presentations. Editable HTML source and a
+  render script are in `docs/images/source/`.
+- Portal: a "Let AI generate abstract for me" checkbox, checked by default. Unchecked, the
+  person writes their own abstract (50 to 1,500 characters, with a live counter). Title and
+  abstract are moderated together with the same house rule before they are saved
+  (`moderate_abstract`), no agent session runs, and the proposal's source is
+  `manual_abstract`.
+- Portal: email format checks in the browser and on the server (`normalize_email`).
+- Portal: after an error the form keeps what was typed; the submit button disables itself
+  while a proposal is sent; the status page links to the new proposal on the board.
+- Portal: a submission that moderation rejects (or that fails) returns to the form with
+  everything still filled in (email, title, abstract, checkbox, track, persona), the reason
+  and any suggested alternative shown on top.
+- Proposal board: groups "Accepted", "Reviewed" (reviewed and waitlisted), "Not this time"
+  (declined), and "Awaiting review" (submitted, not reviewed yet). Each card shows title,
+  an expandable abstract, the score out of 5 as a bar, the reviewer's feedback, a next step
+  for its status, and the contact email at the bottom. Also: counts per group, a track filter
+  (`/board?track=ai-ml`), Expand all / Collapse all, highest scores first, a link anchor per
+  proposal, and a dark-mode palette.
+- Proposal board: contact emails are masked, keeping the first two letters and the last
+  letter before the @ (`ad***e@example.com`; three letters or fewer keep only the first).
+- `Store.list_board_proposals()` for the board, so the Event DB `list_proposals` tool stays
+  short for agents.
+
+#### Changed
+- Members are identified by a contact email instead of a first name: the `members.name`
+  column is now `members.contact_email`, and proposals return `contact_email` instead of
+  `speaker_name`. A database from before this change is migrated when the store opens; old
+  first names become placeholder `name@example.com` addresses.
+- `concierge propose --name` is now `--email` (default `sam@example.com`). `concierge
+  proposals` and `concierge data sample` show a "Contact email" column.
+- Sample speakers use `@example.com` contact emails; sample titles keep acronyms like "AI".
+- The proposal form asks, in order: contact email, talk title (always required), the AI
+  checkbox or the abstract, track, and persona. The topic list and the "type your own topic"
+  field are gone: the title is what the Abstract Writer writes about, and the stored title is
+  always the person's. `submit_proposal` and `write_abstract` take `title` instead of `topic`,
+  and `concierge propose` takes a title. Every title is moderated (there are no predefined
+  topics to skip the check). AI-written proposals have source `ai_abstract`.
+- The abstract rubric requires the title given in the task, unchanged, and the Abstract
+  Writer's prompt and description say so.
+- `content/topics.yaml` now only seeds `concierge data sample`, with AI-centered topics
+  (agents, distillation, training and fine-tuning, agent skills, RAG, evaluation, MCP, and
+  more). With `--generate`, sample titles come from the templates and are moderated too.
+- Speaker Liaison (both variants) and Scheduler prompts report the speaker's contact email
+  instead of a name, since members no longer have one. Phase 2b copies updated to match.
+- Portal styling: a header with navigation, panels, and status colors; the submit button
+  reads "Submit talk proposal".
+
 ### 2026-11-19
 
 #### Added

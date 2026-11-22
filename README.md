@@ -1,18 +1,31 @@
 # Conference Concierge
 
-A small, friendly demo of **Claude Managed Agents**: a team of agents that helps run a
+A small, friendly demo of **Claude Managed Agents**. 
+I created it for a 15-minute presentation at a Claude user group in San Diego. 
+
+Conference Concierge consists of a team of agents that helps run a
 user-group meetup. Members propose talks from their phones, agents review them every
 morning, an organizer approves the agenda, speakers get a sponsor perk, and attendees ask
 about the venue.
 
-It is built to be read. Every feature has a short [task guide](docs/guides/README.md) that
-points to the exact lines that implement it, and the source carries matching markers:
+This source is built to be read. Major features have a short [task guide](docs/guides/README.md) that
+points to the exact lines that implement it, and the source carries matching markers, like this one: 
 
 ```python
 # Guide 05 · Wiring up OpenTelemetry · Step 2: register the tracer provider.
 ```
 
 Search the repo for `Guide 05 ·` to see every step of a guide in place.
+
+Disclaimer: All the code and guides are AI generated. This is a sample that introduces concepts and features; it is not production code or production prompts.  If you see issues, please [report them](https://github.com/jaimerodriguez/conference-concierge/issues) or [create a PR](https://github.com/jaimerodriguez/conference-concierge/pulls).
+
+## How a talk proposal moves through the concierge's workflows
+
+![Who does the work, from proposal to agenda](docs/images/flow-who-does-the-work.png)
+
+Each step's agent, its type, and the guide that explains it are mapped in
+[the guide map](docs/images/guide-map.png). The images are rendered from HTML in
+[docs/images/source](docs/images/source/README.md).
 
 ## What it shows
 
@@ -30,7 +43,7 @@ Search the repo for `Guide 05 ·` to see every step of a guide in place.
 | Scheduled agents | The daily proposal review | [10](docs/guides/10-scheduling-an-agent.md) |
 | Outcomes | Abstracts and the review digest, graded against rubrics | [11](docs/guides/11-grading-with-outcomes.md) |
 | Approvals and budgets | The organizer approves each booking and perk code | [12](docs/guides/12-approvals-and-budgets.md) |
-| Input moderation | Topics typed by the audience | [13](docs/guides/13-moderating-user-input.md) |
+| Input moderation | Titles and abstracts typed by the audience | [13](docs/guides/13-moderating-user-input.md) |
 | Self-hosted sandbox (phase 2a) | Tools run in your container | [20](docs/guides/20-self-hosted-sandbox.md) |
 | Self-hosted Managed Agents (phase 2b) | You run the service; see what you keep and lose | [21](docs/guides/21-migrating-to-self-hosted-managed-agents.md) |
 
@@ -159,7 +172,8 @@ For a clean start, clear the data from earlier runs and add sample proposals fir
 [Demo data](#demo-data) below): `uv run concierge data clear`, then `uv run concierge data sample`.
 
 ```sh
-uv run concierge propose "bunnies" --name Sam     # or use the form at your tunnel address
+uv run concierge propose "Building AI agents"     # AI writes the abstract; or use the form at your tunnel address
+uv run concierge propose "Building AI agents" --abstract-file my-abstract.md   # or bring your own abstract
 uv run concierge review run                       # fire the daily review now
 uv run concierge agenda build                     # approve bookings and perk codes (y, n, or a for all)
 uv run concierge ask "Where do I park?"           # the Attendee Helper, from memory
@@ -172,14 +186,18 @@ docker compose up -d                              # Jaeger at http://localhost:1
 Separate from setup. These commands clear and add the data that runs create.
 
 ```sh
-uv run concierge data sample             # 8 submitted proposals, offline and free
-uv run concierge data sample --generate  # abstracts by the Abstract Writer, about 1 cent each
+uv run concierge data sample             # 10 submitted proposals, offline and free
+uv run concierge data sample --generate  # same set; accurate abstracts by the Abstract Writer (about 1 cent each), problem cases moderated
 uv run concierge data clear              # local Event DB + run notes in ops-notes (asks first)
 uv run concierge data clear --local-only # only the local Event DB, works offline
 ```
 
-`data sample` gives each proposal a distinct speaker and spreads them over the tracks
-(`--count`, `--seed`). `data clear` deletes members, proposals, reviews, calendar events and
+`data sample` adds the proposals in `content/sample_proposals.yaml`, each from a distinct
+speaker. Five are solid; the other five are problem cases the review should catch: a title
+that does not match its abstract, inappropriate content, a prompt injection, a sales pitch,
+and a workshop squeezed into a lightning slot. The command prints which is which (never
+saved, so reviewers judge the text alone), and the file says what each should trigger.
+`--count N` takes the first N, accurate ones first, ten at most. `data clear` deletes members, proposals, reviews, calendar events and
 perks from the local Event DB. It also resets the ops-notes memory store in your workspace
 to `content/ops-notes`: the notes agents wrote during runs are deleted, by name, after you
 confirm. That deletion is permanent. It keeps the Calendar sign-in, `content/`, the rubrics
@@ -209,7 +227,7 @@ Something went wrong? Start with `uv run concierge doctor`, then see
 
 ```
 managed/     what `ant apply` manages: agents, environments, memory stores, vault, deployment
-content/     venue profiles, rubrics, personas, topics (plain Markdown and YAML)
+content/     venue profiles, rubrics, personas, sample proposals (plain Markdown and YAML)
 src/concierge/
   cli.py            the `concierge` command
   sessions.py       the event loop every flow shares
@@ -218,7 +236,7 @@ src/concierge/
   proposals.py, sample_data.py      submitting proposals; `data sample`
   memory.py, vaults.py, oauth_client.py, telemetry.py
   services/         mock OAuth server, Calendar MCP, Event DB MCP, sponsor API
-  portal/           the proposal form
+  portal/           the proposal form and proposal board
 phase2/      a-self-hosted-sandbox/ and b-self-hosted-service/
 docs/        SPEC.md and the task guides
 tests/       run without an API key
@@ -234,6 +252,22 @@ uv run pytest
 `tests/test_guides.py` checks that every `Guide NN · Step N` marker in the source is
 described in its guide, and that every file a guide points to exists. If you add a step,
 add it in both places.
+
+### Publishing your copy
+
+`setup host` and `setup deployment` write your tunnel host and vault ID into the files
+under `managed/` and `phase2/b-self-hosted-service/`. Before you commit those files to a
+public repo, put the sample values back, commit, then restore your own:
+
+```sh
+uv run concierge setup public --check   # list the files that hold your values (exit 1 if any)
+uv run concierge setup public           # sample host and `vault_ids: []` back in
+git add managed phase2 && git commit
+uv run concierge setup host && uv run concierge setup deployment   # your values back
+```
+
+Do not run `ant apply` while the sample values are in: it would point your agents at
+`concierge.example.com`. `claude-lock.json` and `.env` are git-ignored and never touched.
 
 ## License
 

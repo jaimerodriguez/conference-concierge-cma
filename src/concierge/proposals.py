@@ -1,18 +1,79 @@
-"""The proposal pipeline: moderate (when needed), write the abstract, save the proposal."""
+"""The proposal pipeline: moderate, write the abstract (when asked), save the proposal.
+
+A person always gives a title. They either let the Abstract Writer draft the abstract for it,
+or write their own. Both paths end in the same stored proposal.
+"""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
 from anthropic import Anthropic
 
 from concierge.abstracts import write_abstract
-from concierge.catalog import get_catalog
+from concierge.catalog import Catalog, get_catalog
 from concierge.config import Settings, get_settings
-from concierge.moderation import FRIENDLY_REJECTION, moderate_topic
+from concierge.moderation import (
+    FRIENDLY_REJECTION,
+    MAX_ABSTRACT_CHARS,
+    MAX_TITLE_CHARS,
+    moderate_abstract,
+    moderate_topic,
+)
 from concierge.services.store import Store
 from concierge.telemetry import get_tracer
+
+MAX_EMAIL_CHARS = 254  # the longest address SMTP allows
+MIN_ABSTRACT_CHARS = 50
+# Deliberately loose: one @, no spaces, and a dot in the domain. Real validation is sending mail.
+_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s.]{2,}")
+
+RECEIVED = "Your proposal is in. The Program Chair reviews new proposals every morning."
+
+
+def normalize_email(value: str) -> str | None:
+    """The address, trimmed with its domain lowercased, or None when it is not an address."""
+    value = value.strip()
+    if len(value) > MAX_EMAIL_CHARS or not _EMAIL.fullmatch(value):
+        return None
+    local, domain = value.rsplit("@", 1)
+    return f"{local}@{domain.lower()}"
+
+
+def check_submission(
+    catalog: Catalog,
+    *,
+    contact_email: str,
+    title: str,
+    track_id: str,
+    persona_id: str,
+    abstract: str | None = None,
+) -> str | None:
+    """The first problem with a submission, in the order the portal form asks, or None.
+
+    These checks are free and need no model call, so the portal and `concierge propose` both
+    run them before ``submit_proposal``. ``abstract`` is None when the Abstract Writer writes it.
+    """
+    title = title.strip()
+    if normalize_email(contact_email) is None:
+        return "Please enter a valid contact email, like sam@example.com."
+    if not title:
+        return "Give your talk a title."
+    if len(title) > MAX_TITLE_CHARS:
+        return f"Please keep the title under {MAX_TITLE_CHARS} characters."
+    if abstract is not None:
+        abstract = abstract.strip()
+        if len(abstract) < MIN_ABSTRACT_CHARS:
+            return f"Please write an abstract of at least {MIN_ABSTRACT_CHARS} characters."
+        if len(abstract) > MAX_ABSTRACT_CHARS:
+            return f"Please keep the abstract under {MAX_ABSTRACT_CHARS} characters."
+    if track_id not in (tracks := [track.id for track in catalog.tracks]):
+        return f"Pick one of the tracks: {', '.join(tracks)}."
+    if persona_id not in (personas := [persona.id for persona in catalog.personas]):
+        return f"Pick one of the personas: {', '.join(personas)}."
+    return None
 
 
 @dataclass(frozen=True)
@@ -28,42 +89,57 @@ def submit_proposal(
     client: Anthropic,
     store: Store,
     *,
-    member_name: str,
+    contact_email: str,
     persona_id: str,
     track_id: str,
-    topic: str,
+    title: str,
+    abstract: str | None = None,
     settings: Settings | None = None,
 ) -> ProposalOutcome:
-    """Turn a persona + topic + track into a stored proposal.
+    """Turn a title + persona + track into a stored proposal.
 
-    Predefined topics skip moderation; anything typed by a person is screened first.
+    With no ``abstract``, the Abstract Writer drafts one for the title, in the persona's voice.
+    Pass ``abstract`` to save the person's own text instead. The title is the person's either
+    way, and everything they typed is screened before it is used.
     """
+    email = normalize_email(contact_email)
+    if email is None:
+        return ProposalOutcome(accepted_for_review=False, message="Please enter a valid email.")
+    if abstract is not None:
+        return _submit_own_abstract(
+            client,
+            store,
+            contact_email=email,
+            persona_id=persona_id,
+            track_id=track_id,
+            title=title,
+            abstract=abstract,
+        )
+
     settings = settings or get_settings()
     catalog = get_catalog()
     persona = catalog.persona(persona_id)
     track = catalog.track(track_id)
-    topic = topic.strip()
-    predefined = topic in catalog.topics
+    title = title.strip()
 
     # Guide 05 · Wiring up OpenTelemetry · Step 4: wrap a whole operation in your own span.
     # The SDK's spans (and, with API tracing on, Anthropic's server-side spans) nest under
     # it, so one trace shows moderation, the session, and every model request inside it.
     with get_tracer().start_as_current_span("concierge.submit_proposal") as span:
         span.set_attribute("concierge.track", track.id)
-        span.set_attribute("concierge.topic_predefined", predefined)
+        span.set_attribute("concierge.abstract_source", "ai")
 
-        if not predefined:
-            # Guide 13 · Moderating user input · Step 1: screen typed input before any agent.
-            verdict = moderate_topic(client, topic)
-            span.set_attribute("concierge.moderation_allowed", verdict.allowed)
-            if not verdict.allowed:
-                return ProposalOutcome(
-                    accepted_for_review=False,
-                    message=verdict.reason or FRIENDLY_REJECTION,
-                    suggestion=verdict.suggestion,
-                )
+        # Guide 13 · Moderating user input · Step 1: screen typed input before any agent.
+        verdict = moderate_topic(client, title, max_chars=MAX_TITLE_CHARS)
+        span.set_attribute("concierge.moderation_allowed", verdict.allowed)
+        if not verdict.allowed:
+            return ProposalOutcome(
+                accepted_for_review=False,
+                message=verdict.reason or FRIENDLY_REJECTION,
+                suggestion=verdict.suggestion,
+            )
 
-        run = write_abstract(client, persona=persona, track=track, topic=topic, settings=settings)
+        run = write_abstract(client, persona=persona, track=track, title=title, settings=settings)
         if run.abstract is None:
             return ProposalOutcome(
                 accepted_for_review=False,
@@ -71,19 +147,62 @@ def submit_proposal(
                 session_id=run.session.session_id,
             )
 
-        member = store.find_or_add_member(member_name.strip() or "Anonymous", persona=persona.id)
+        member = store.find_or_add_member(email, persona=persona.id)
         proposal = store.add_proposal(
             member_id=member["id"],
             event_id=catalog.event.id,
             track=track.id,
             format=run.abstract.format,
-            title=run.abstract.title,
+            title=title,  # the person's title, even if the writer suggested another
             abstract=run.abstract.abstract,
-            source="predefined_topic" if predefined else "custom_topic",
+            source="ai_abstract",
         )
         return ProposalOutcome(
             accepted_for_review=True,
-            message="Your proposal is in. The Program Chair reviews new proposals every morning.",
+            message=RECEIVED,
             proposal=proposal,
             session_id=run.session.session_id,
         )
+
+
+def _submit_own_abstract(
+    client: Anthropic,
+    store: Store,
+    *,
+    contact_email: str,
+    persona_id: str,
+    track_id: str,
+    title: str,
+    abstract: str,
+) -> ProposalOutcome:
+    """Screen a title and abstract the person wrote, then store them as they are."""
+    catalog = get_catalog()
+    persona = catalog.persona(persona_id)
+    track = catalog.track(track_id)
+    title, abstract = title.strip(), abstract.strip()
+
+    with get_tracer().start_as_current_span("concierge.submit_proposal") as span:
+        span.set_attribute("concierge.track", track.id)
+        span.set_attribute("concierge.abstract_source", "manual")
+
+        # Everything a person types is screened, and an abstract is all typed text.
+        verdict = moderate_abstract(client, title, abstract)
+        span.set_attribute("concierge.moderation_allowed", verdict.allowed)
+        if not verdict.allowed:
+            return ProposalOutcome(
+                accepted_for_review=False,
+                message=verdict.reason or FRIENDLY_REJECTION,
+                suggestion=verdict.suggestion,
+            )
+
+        member = store.find_or_add_member(contact_email, persona=persona.id)
+        proposal = store.add_proposal(
+            member_id=member["id"],
+            event_id=catalog.event.id,
+            track=track.id,
+            format=track.format,
+            title=title,
+            abstract=abstract,
+            source="manual_abstract",
+        )
+        return ProposalOutcome(accepted_for_review=True, message=RECEIVED, proposal=proposal)

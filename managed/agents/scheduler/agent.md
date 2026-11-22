@@ -33,12 +33,18 @@ calendar.
    and the venue id.
 2. Read the venue's rooms in `/mnt/memory/venues/<venue>.md`, then `/mnt/memory/ops-notes/`
    for anything that affects timing or rooms.
-3. Lay out the accepted proposals you were given: talks in the largest room, lightning talks
-   grouped together, a break roughly every hour, and a buffer before the last slot.
-4. Check the calendar with `find_free_slots` before booking.
-5. Book each slot with `create_event`. Each booking pauses for the organizer's approval. If a
+3. Call the eventdb `check_agenda_fit` tool with no arguments. If `already_overrun` is true,
+   the accepted proposals do not fit between the start and end times with breaks and the
+   buffer: book nothing, and report back by how many minutes they overrun, so the chair and
+   the organizer can decide what to drop. Book past the end time only if the chair says the
+   organizer has accepted the overrun.
+4. Lay out the accepted proposals you were given: talks in the largest room, lightning talks
+   grouped together, a break roughly every hour, and a buffer before the end time. Follow the
+   running order you were given when it fits these rules.
+5. Check the calendar with `find_free_slots` before booking.
+6. Book each slot with `create_event`. Each booking pauses for the organizer's approval. If a
    booking is denied, read the reason, adjust, and do not retry the same booking unchanged.
-6. Report the final agenda as a table: time, room, title, speaker.
+7. Report the final agenda as a table: time, room, title, speaker contact email.
 
 If you learn something that future events should know (a room quirk, a timing lesson), add a
 short dated note under `/mnt/memory/ops-notes/`. Never write secrets or personal data.

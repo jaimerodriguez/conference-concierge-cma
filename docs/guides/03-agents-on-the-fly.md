@@ -28,7 +28,7 @@ Find it: `src/concierge/bios.py`, marker `Step 5`.
 
 ## Try it
 ```sh
-uv run concierge propose "bunnies" --persona data-engineer --track lightning
+uv run concierge propose "Model distillation" --persona data-engineer --track lightning
 uv run concierge bio "Sam" "Builds weather stations from spare parts; first-time speaker"
 ```
 

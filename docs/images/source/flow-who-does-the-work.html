@@ -1,0 +1,119 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+body { width: 1800px; height: 1000px; position: relative; overflow: hidden; }
+.abs { position: absolute; }
+header { left: 44px; top: 36px; }
+header h1 { font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
+header p { color: var(--muted); font-size: 17px; margin-top: 4px; }
+/* status track */
+.track { left: 44px; right: 44px; top: 128px; height: 74px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; display: flex; align-items: center; padding: 0 22px; gap: 10px; }
+.track .lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); width: 130px; line-height: 1.3; }
+.stop { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; padding: 7px 14px; border-radius: 99px; background: var(--s); color: var(--c); white-space: nowrap; }
+.stop small { font-weight: 500; color: var(--muted); font-size: 12px; }
+.bar { flex: 1; height: 2px; background: repeating-linear-gradient(90deg, #b9b2a3 0 6px, transparent 6px 11px); position: relative; }
+.bar::after { content: ""; position: absolute; right: -2px; top: -4px; border: 5px solid transparent; border-left: 7px solid #b9b2a3; }
+/* panels */
+.panel { top: 228px; bottom: 96px; border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,.55); }
+.panel h2 { position: absolute; left: 20px; top: 16px; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--c); }
+.panel h2 span { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; margin-left: 6px; font-size: 13.5px; }
+.panel .stripe { position: absolute; left: 0; right: 0; top: 0; height: 5px; border-radius: 18px 18px 0 0; background: var(--c); }
+/* nodes */
+.node { position: absolute; width: 230px; border-radius: 12px; background: var(--card); border: 1.5px solid var(--c); padding: 10px 12px; box-shadow: 0 3px 0 var(--s); z-index: 2; }
+.node .name { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 15px; }
+.node .type { font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--c); margin-top: 2px; }
+.node .det { font-size: 12.5px; color: #3b4150; margin-top: 4px; line-height: 1.35; }
+.node.sm { width: 150px; padding: 8px 10px; } .node.sm .name { font-size: 13px; }
+.actor { position: absolute; z-index: 2; background: var(--ink); color: #fff; border-radius: 99px; padding: 8px 16px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.out { position: absolute; z-index: 2; border: 1.5px dashed #b9b2a3; background: var(--paper); border-radius: 10px; padding: 8px 12px; font-size: 13px; color: #3b4150; line-height: 1.35; }
+.out b { color: var(--ink); }
+.ask { position: absolute; z-index: 3; font-size: 12px; font-weight: 700; color: var(--adv); background: var(--adv-s); border-radius: 99px; padding: 3px 10px; white-space: nowrap; }
+.lab { position: absolute; z-index: 3; font-size: 12px; color: var(--muted); background: var(--paper); padding: 0 6px; white-space: nowrap; }
+.a-fly { --c: var(--fly); --s: var(--fly-s); } .a-sched { --c: var(--sched); --s: var(--sched-s); }
+.a-coord { --c: var(--coord); --s: var(--coord-s); } .a-sub { --c: var(--sub); --s: var(--sub-s); }
+.a-adv { --c: var(--adv); --s: var(--adv-s); } .a-api { --c: var(--api); --s: var(--api-s); } .a-ok { --c: var(--green); --s: var(--green-s); }
+.a-await { --c: var(--amber); --s: var(--amber-s); } .a-rev { --c: var(--blue); --s: var(--sub-s); }
+svg#wires { position: absolute; inset: 0; z-index: 1; }
+footer { left: 44px; right: 44px; bottom: 32px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+footer .sp { flex: 1; }
+</style></head><body>
+<header class="abs"><h1>Who does the work, from proposal to agenda</h1>
+<p>Conference Concierge · the AI Meetup demo of Claude Managed Agents · five agents, an advisor, one plain API call, and two people</p></header>
+
+<div class="track abs">
+  <div class="lbl">On the proposal board</div>
+  <div class="stop a-await">Awaiting review <small>after step 1</small></div><div class="bar"></div>
+  <div class="stop a-rev">Reviewed <small>or Not this time</small></div><div class="bar"></div>
+  <div class="stop a-ok">Accepted</div><div class="bar"></div>
+  <div class="stop a-ok">🎉 On the agenda <small>slot booked, perk sent</small></div>
+</div>
+
+<div class="panel abs a-fly" style="left:44px; width:520px"><div class="stripe"></div><h2>1 · Submit<span>live, while the speaker waits</span></h2></div>
+<div class="panel abs a-sched" style="left:584px; width:520px"><div class="stripe"></div><h2>2 · Review<span>unattended, 08:00 every day</span></h2></div>
+<div class="panel abs a-coord" style="left:1124px; width:632px"><div class="stripe"></div><h2>3 · Decide &amp; publish<span>one session, organizer approves</span></h2></div>
+
+<!-- Panel 1 -->
+<div class="actor" id="p1" style="left:170px; top:290px">📱 Speaker: email, title, track</div>
+<div class="node a-api" id="mod" style="left:189px; top:372px"><div class="name">moderator</div><div class="type">Not an agent</div><div class="det">One structured-output API call · Haiku 5.5</div></div>
+<div class="node a-fly" id="aw" style="left:70px; top:540px"><div class="name">abstract-writer</div><div class="type">On the fly</div><div class="det">Base agent, persona prompt per session · Haiku 5.5 · outcome-graded</div></div>
+<div class="out" id="own" style="left:334px; top:556px; width:206px">✍️ <b>Or the speaker writes it.</b> Saved as written, no session.</div>
+<div class="out" id="saved" style="left:189px; top:735px; width:230px"><b>Proposal saved</b> in the Event DB, the board shows it right away</div>
+<div class="lab" style="left:110px; top:500px">AI abstract</div>
+<div class="lab" style="left:395px; top:500px">own abstract</div>
+
+<!-- Panel 2 -->
+<div class="actor" id="clk" style="left:760px; top:290px">⏰ Cron fires</div>
+<div class="node a-sched" id="dep" style="left:729px; top:360px"><div class="name">daily-proposal-review</div><div class="type">Scheduled deployment</div><div class="det">$5 cap per run</div></div>
+<div class="node a-coord" id="ch1" style="left:729px; top:480px"><div class="name">program-chair</div><div class="type">Coordinator</div><div class="det">Sonnet 5.5 · writes the digest</div></div>
+<div class="node a-sub sm" id="r1" style="left:600px; top:640px"><div class="name">cfp-reviewer</div><div class="type">Subagent</div></div>
+<div class="node a-sub sm" id="r2" style="left:769px; top:640px"><div class="name">cfp-reviewer</div><div class="type">Subagent</div></div>
+<div class="node a-sub sm" id="r3" style="left:938px; top:640px"><div class="name">cfp-reviewer</div><div class="type">Subagent</div></div>
+<div class="lab" style="left:778px; top:596px">workflow, one per proposal</div>
+<div class="out" id="dig" style="left:640px; top:760px; width:430px"><b>Scores</b> recorded by each reviewer against base + track rubrics (memory). <b>digest.md</b> graded by an outcome rubric.</div>
+
+<!-- Panel 3 -->
+<div class="actor" id="org" style="left:1176px; top:290px">🧑‍💼 Organizer: “accept the top four, book it”</div>
+<div class="node a-coord" id="ch2" style="left:1170px; top:380px"><div class="name">program-chair</div><div class="type">Coordinator</div><div class="det">Accepts talks, ties go to variety</div></div>
+<div class="node a-adv" id="adv" style="left:1500px; top:380px"><div class="name">advisor</div><div class="type">Advisor</div><div class="det">Opus 5.5 · checks the agenda's balance</div></div>
+<div class="node a-sub" id="sch" style="left:1170px; top:560px"><div class="name">scheduler</div><div class="type">Subagent</div><div class="det">Sonnet 5.5 · Calendar MCP, organizer's OAuth from the vault</div></div>
+<div class="node a-sub" id="liai" style="left:1500px; top:560px"><div class="name">speaker-liaison</div><div class="type">Subagent</div><div class="det">Haiku 5.5 · sponsor key in the vault, never in the sandbox</div></div>
+<div class="ask" style="left:1186px; top:688px">✋ organizer approves each booking</div>
+<div class="ask" style="left:1508px; top:688px">✋ organizer approves each code</div>
+<div class="out" id="cal" style="left:1170px; top:760px; width:230px">📅 <b>Slots on the calendar</b></div>
+<div class="out" id="perk" style="left:1500px; top:760px; width:230px">🎁 <b>$50 perk code</b> per speaker</div>
+<div class="lab" style="left:1418px; top:404px">consults</div>
+<div class="lab" style="left:1388px; top:518px">delegates</div>
+
+<svg id="wires" width="1800" height="1000" viewBox="0 0 1800 1000"></svg>
+
+<footer class="abs">
+  <span class="chip t-fly"><i class="dot"></i>On the fly</span>
+  <span class="chip t-sched"><i class="dot"></i>Scheduled deployment</span>
+  <span class="chip t-coord"><i class="dot"></i>Coordinator</span>
+  <span class="chip t-sub"><i class="dot"></i>Subagent</span>
+  <span class="chip t-adv"><i class="dot"></i>Advisor</span>
+  <span class="chip t-api"><i class="dot"></i>Not an agent</span>
+  <span class="sp"></span>
+  Off the main path: <b class="mono" style="color:var(--ink)">attendee-helper</b> (answers from memory) · <b class="mono" style="color:var(--ink)">speaker-bio-writer</b> (created at runtime)
+</footer>
+
+<script>
+const svg = document.getElementById('wires');
+const R = id => document.getElementById(id).getBoundingClientRect();
+const pt = (r, side) => ({ b: [r.left + r.width/2, r.bottom], t: [r.left + r.width/2, r.top], l: [r.left, r.top + r.height/2], r: [r.right, r.top + r.height/2] })[side];
+function wire(a, sa, b, sb, opts = {}) {
+  const [x1, y1] = pt(R(a), sa), [x2, y2] = pt(R(b), sb);
+  let d;
+  if (sa === 'b' && sb === 't') { const my = (y1 + y2) / 2; d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2 - 4}`; }
+  else d = `M${x1},${y1} L${x2 - 4},${y2}`;
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', d); p.setAttribute('fill', 'none'); p.setAttribute('stroke', opts.c || '#a39c8d');
+  p.setAttribute('stroke-width', 2); if (opts.dash) p.setAttribute('stroke-dasharray', '6 5');
+  p.setAttribute('marker-end', 'url(#ah)'); svg.appendChild(p);
+}
+svg.innerHTML = '<defs><marker id="ah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a39c8d"/></marker></defs>';
+wire('p1','b','mod','t'); wire('mod','b','aw','t'); wire('mod','b','own','t'); wire('aw','b','saved','t'); wire('own','b','saved','t');
+wire('clk','b','dep','t'); wire('dep','b','ch1','t'); ['r1','r2','r3'].forEach(r => { wire('ch1','b',r,'t'); wire(r,'b','dig','t'); });
+wire('org','b','ch2','t'); wire('ch2','r','adv','l',{dash:1}); wire('ch2','b','sch','t'); wire('ch2','b','liai','t');
+wire('sch','b','cal','t'); wire('liai','b','perk','t');
+</script>
+</body></html>

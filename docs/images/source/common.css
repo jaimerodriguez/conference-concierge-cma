@@ -1,0 +1,26 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --ink: #1d2230; --muted: #5d6475; --line: #d9d3c7; --paper: #fbf8f3; --card: #ffffff;
+  --fly: #7353e8; --fly-s: #efeafe;
+  --sched: #c97a12; --sched-s: #fdf1de;
+  --coord: #0d7f81; --coord-s: #dcf3f2;
+  --sub: #2f63cf; --sub-s: #e3ecfc;
+  --adv: #c93a6e; --adv-s: #fbe4ee;
+  --api: #5b6170; --api-s: #eceef2;
+  --human: #2b2f3a;
+  --green: #2f8f4e; --green-s: #e1f3e6; --blue: #2f63cf; --rose: #c2415c; --rose-s: #fbe5ea; --amber: #c27a12; --amber-s: #fcefd9;
+}
+body { font-family: Inter, sans-serif; color: var(--ink); background: var(--paper); -webkit-font-smoothing: antialiased; }
+.mono { font-family: "JetBrains Mono", monospace; }
+.g { display: inline-block; font-family: "JetBrains Mono", monospace; font-weight: 600; font-size: 11px;
+     background: var(--ink); color: #fff; border-radius: 5px; padding: 2px 6px; margin: 0 3px 3px 0; letter-spacing: .02em; }
+.g.p2 { background: #fff; color: var(--ink); border: 1.5px solid var(--ink); }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .05em;
+        text-transform: uppercase; border-radius: 99px; padding: 3px 9px; }
+.t-fly { background: var(--fly-s); color: var(--fly); }
+.t-sched { background: var(--sched-s); color: var(--sched); }
+.t-coord { background: var(--coord-s); color: var(--coord); }
+.t-sub { background: var(--sub-s); color: var(--sub); }
+.t-adv { background: var(--adv-s); color: var(--adv); }
+.t-api { background: var(--api-s); color: var(--api); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; }

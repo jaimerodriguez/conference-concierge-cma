@@ -10,10 +10,12 @@ from typer.testing import CliRunner
 from concierge import cli
 from concierge.catalog import load_catalog
 from concierge.config import REPO_ROOT, Settings
-from concierge.sample_data import create_offline, plan_samples
+from concierge.moderation import MAX_ABSTRACT_CHARS, MAX_TITLE_CHARS
+from concierge.sample_data import MAX_SAMPLES, create_offline, load_samples
 from concierge.services.store import Store
 
 CATALOG = load_catalog(REPO_ROOT / "content")
+SAMPLES = load_samples(REPO_ROOT / "content")
 
 
 @pytest.fixture
@@ -25,7 +27,7 @@ def store(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> Store:
 
 
 def _fill(store: Store) -> None:
-    proposal = create_offline(store, CATALOG, 2, seed=1)[0]
+    proposal = create_offline(store, CATALOG, SAMPLES[:2])[0]
     store.record_review(
         proposal["id"], scores={"Respectful": 5}, overall=4.0, recommendation="accept", summary="ok"
     )
@@ -59,21 +61,53 @@ def test_clear_asks_first_and_keeps_the_calendar_sign_in(store: Store) -> None:
 
 
 def test_sample_offline_is_free_varied_and_submitted(store: Store) -> None:
-    result = CliRunner().invoke(cli.app, ["data", "sample", "--seed", "7"])
+    result = CliRunner().invoke(cli.app, ["data", "sample"])
     assert result.exit_code == 0, result.output
     assert "no cost" in result.output
     proposals = store.list_proposals(status="submitted")
-    assert len(proposals) == 8
-    names = {store.get_member(p["member_id"])["name"] for p in proposals}  # type: ignore[index]
-    assert len(names) == 8  # one distinct speaker per proposal
+    assert len(proposals) == MAX_SAMPLES
+    emails = {store.get_member(p["member_id"])["contact_email"] for p in proposals}  # type: ignore[index]
+    assert len(emails) == MAX_SAMPLES  # one distinct speaker per proposal
+    assert all(email.endswith("@example.com") for email in emails)
     assert len({p["track"] for p in proposals}) == len(CATALOG.tracks)  # every track used
     full = [store.get_proposal(p["id"]) for p in proposals]
     assert all(p and p["title"] and p["abstract"] and p["source"] == "sample" for p in full)
+    assert "injection" in result.output  # the Case column is printed
 
 
-def test_sample_plans_repeat_with_a_seed() -> None:
-    first = [(p.name, p.topic, p.track.id) for p in plan_samples(CATALOG, 8, seed=3)]
-    assert first == [(p.name, p.topic, p.track.id) for p in plan_samples(CATALOG, 8, seed=3)]
+def test_sample_cases_are_never_saved(store: Store) -> None:
+    CliRunner().invoke(cli.app, ["data", "sample"])
+    saved = " ".join(
+        f"{p['title']} {p['abstract']}"  # type: ignore[index]
+        for p in (store.get_proposal(row["id"]) for row in store.list_proposals())
+    )
+    assert all(sample.expect not in saved for sample in SAMPLES)
+
+
+def test_sample_set_has_accurate_proposals_first_then_the_problem_cases() -> None:
+    cases = [sample.case for sample in SAMPLES]
+    assert 8 <= len(cases) <= MAX_SAMPLES
+    assert cases[:5] == ["accurate"] * 5 and "accurate" not in cases[5:]
+    for needed in ("title does not match abstract", "inappropriate content"):
+        assert needed in cases[5:7]  # the two the demo must show, kept by --count 7
+
+
+def test_sample_proposals_fit_the_limits_and_the_catalog() -> None:
+    for sample in SAMPLES:
+        CATALOG.persona(sample.persona), CATALOG.track(sample.track)  # raise when unknown
+        assert len(sample.title) <= MAX_TITLE_CHARS
+        assert len(sample.abstract) <= MAX_ABSTRACT_CHARS
+        if sample.accurate:  # the base rubric's length criterion
+            assert 60 <= len(sample.abstract.split()) <= 120, sample.title
+
+
+def test_sample_count_takes_from_the_top_and_stops_at_ten(store: Store) -> None:
+    result = CliRunner().invoke(cli.app, ["data", "sample", "--count", "3"])
+    assert result.exit_code == 0, result.output
+    titles = [p["title"] for p in store.list_proposals()]
+    assert sorted(titles) == sorted(s.title for s in SAMPLES[:3])
+    too_many = CliRunner().invoke(cli.app, ["data", "sample", "--count", "11"])
+    assert too_many.exit_code != 0
 
 
 def test_sample_generate_states_the_cost_and_asks(store: Store) -> None:
@@ -85,39 +119,60 @@ def test_sample_generate_states_the_cost_and_asks(store: Store) -> None:
     assert store.list_proposals() == []
 
 
-def test_sample_generate_uses_the_propose_path(
+def test_sample_generate_writes_accurate_abstracts_and_screens_the_problem_cases(
     store: Store, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    calls: list[str] = []
+    calls: list[tuple[str, str | None]] = []
 
-    def fake_submit(client, store, *, member_name, persona_id, track_id, topic):  # type: ignore[no-untyped-def]
-        calls.append(member_name)
-        member = store.find_or_add_member(member_name, persona=persona_id)
+    def fake_submit(client, store, *, contact_email, persona_id, track_id, title, abstract):  # type: ignore[no-untyped-def]
+        calls.append((contact_email, abstract))
+        if abstract and "damn" in abstract:  # moderation stops the inappropriate one
+            return NS(proposal=None, message="Let's keep it friendly.")
+        member = store.find_or_add_member(contact_email, persona=persona_id)
         proposal = store.add_proposal(
             member_id=member["id"],
             event_id="e",
             track=track_id,
             format="talk",
-            title=f"About {topic}",
-            abstract="...",
-            source="predefined_topic",
+            title=title,
+            abstract=abstract or "...",
+            source="manual_abstract" if abstract else "ai_abstract",
         )
         return NS(proposal=proposal, message="in")
 
     monkeypatch.setattr(cli, "_client", lambda: object())
     monkeypatch.setattr("concierge.proposals.submit_proposal", fake_submit)
-    result = CliRunner().invoke(cli.app, ["data", "sample", "--generate", "--count", "2", "--yes"])
+    result = CliRunner().invoke(cli.app, ["data", "sample", "--generate", "--count", "7", "--yes"])
     assert result.exit_code == 0, result.output
-    assert len(calls) == 2 and len(store.list_proposals(status="submitted")) == 2
+    assert [abstract is None for _, abstract in calls] == [True] * 5 + [False] * 2
+    assert "Moderation stopped" in result.output and "inappropriate content" in result.output
+    assert len(store.list_proposals(status="submitted")) == 6
 
 
-def test_a_second_proposal_reuses_the_member_with_that_name(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_a_second_proposal_reuses_the_member_with_that_email(tmp_path) -> None:  # type: ignore[no-untyped-def]
     store = Store(tmp_path / "db.sqlite")
-    first = store.find_or_add_member("Priya", persona="data-engineer")
-    again = store.find_or_add_member(" priya ", persona="weekend-hacker")
+    first = store.find_or_add_member("priya@example.com", persona="data-engineer")
+    again = store.find_or_add_member(" Priya@Example.com ", persona="weekend-hacker")
     assert again["id"] == first["id"]
     assert len(store.list_members()) == 1
-    assert store.find_or_add_member("Sam")["id"] != first["id"]
+    assert store.find_or_add_member("sam@example.com")["id"] != first["id"]
+
+
+def test_an_old_database_with_first_names_is_migrated(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    import sqlite3
+
+    path = tmp_path / "old.sqlite"
+    with sqlite3.connect(path) as db:
+        db.execute(
+            "CREATE TABLE members (id TEXT PRIMARY KEY, name TEXT NOT NULL, persona TEXT,"
+            " roles TEXT NOT NULL DEFAULT '[\"attendee\"]', created_at REAL NOT NULL)"
+        )
+        db.execute("INSERT INTO members (id, name, created_at) VALUES ('mem_1', 'Ada', 0)")
+        db.execute("INSERT INTO members (id, name, created_at) VALUES ('mem_2', 'b@x.org', 0)")
+    store = Store(path)
+    assert store.get_member("mem_1")["contact_email"] == "ada@example.com"  # type: ignore[index]
+    assert store.get_member("mem_2")["contact_email"] == "b@x.org"  # type: ignore[index]
+    Store(path)  # migrating twice is a no-op
 
 
 class FakeMemories:

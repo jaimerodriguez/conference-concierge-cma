@@ -9,6 +9,10 @@ for. In the source, markers look like this:
 
 Search the repo for `Guide 05 ·` to see every step of a guide in place.
 
+![Which guide explains which step](../images/guide-map.png)
+
+The step numbers match the [flow diagram](../images/flow-who-does-the-work.png).
+
 | # | Guide | Feature |
 |---|---|---|
 | 00 | [Setting up the project](00-setting-up.md) | uv, virtual environment, Ruff, tunnel |

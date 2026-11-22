@@ -1,10 +1,18 @@
 """Demo data: a batch of submitted proposals so `review run` has work, and a way to clear it.
 
-Two ways to make proposals:
-- offline (the default): free and instant. Titles and abstracts come from the templates
-  below, filled with the predefined personas, topics, and tracks in content/.
-- generated: each abstract is written by the Abstract Writer, through the same code
-  `concierge propose` uses. About a cent each.
+The proposals live in ``content/sample_proposals.yaml``: five solid ones, then deliberate
+problem cases (a title that does not match its abstract, inappropriate content, a prompt
+injection, a sales pitch, a workshop squeezed into a lightning slot). Each problem case fails
+one thing the review process checks, so the demo shows the process catching it.
+
+Two ways to add them:
+- offline (the default): free and instant. Every proposal is saved as written, straight into
+  the Event DB, so even the inappropriate one reaches the CFP Reviewers. That shows the
+  second line of defense: the "Respectful" criterion declines it and the digest names it.
+- generated: the accurate proposals get their abstract from the Abstract Writer, through the
+  same code `concierge propose` uses. The problem cases keep their own abstracts and go
+  through the "write my own abstract" path, so moderation screens them first and stops the
+  ones that cross the line: the front door.
 
 Everything here touches only the local SQLite store. Nothing in the Anthropic workspace
 (agents, vaults, memory stores, sessions, the deployment) is created or removed.
@@ -12,141 +20,81 @@ Everything here touches only the local SQLite store. Nothing in the Anthropic wo
 
 from __future__ import annotations
 
-import random
-from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
-from concierge.catalog import Catalog, Persona, Track
+import yaml
+from pydantic import BaseModel
+
+from concierge.catalog import Catalog
+from concierge.config import get_settings
 from concierge.services.store import Store
 
-# Distinct first names, so every sample proposal has a recognizable speaker.
-SAMPLE_NAMES = (
-    "Ada",
-    "Bao",
-    "Carmen",
-    "Dev",
-    "Elif",
-    "Farah",
-    "Gus",
-    "Hana",
-    "Ivo",
-    "Juno",
-    "Kofi",
-    "Lena",
-)
+SAMPLE_FILE = "sample_proposals.yaml"
+MAX_SAMPLES = 10
+ACCURATE = "accurate"
 
 # Roughly what one generated abstract cost in earlier runs (Abstract Writer session).
 GENERATE_CENTS_EACH = 1
 
-_TITLES = {
-    "ai-ml": [
-        "Teaching an Agent About {Topic}",
-        "What a Language Model Gets Wrong About {Topic}",
-        "{Topic}, Classified: A Small Model on a Weekend Budget",
-    ],
-    "community": [
-        "How {Topic} Built Our Neighborhood Meetup",
-        "Showing Up for {Topic}: Lessons From Five Years of Gatherings",
-        "Everyone Is Welcome at the {Topic} Table",
-    ],
-    "lightning": [
-        "{Topic} in Five Minutes",
-        "Five Things I Learned From {Topic}",
-        "A Lightning Tour of {Topic}",
-    ],
-    "fun": [
-        "My Unreasonable Obsession With {Topic}",
-        "{Topic}: A Saturday-Morning Experiment",
-        "Overengineering {Topic} for Fun",
-    ],
-}
 
-_OPENERS = {
-    "weekend-hacker": "I started tinkering with {topic} on a Saturday morning and never stopped.",
-    "data-engineer": "I have spent too many late nights cleaning up data about {topic}.",
-    "community-organizer": "Our group first came together over {topic}.",
-    "curious-student": "Six months ago I knew nothing about {topic}, so I asked questions.",
-    "startup-founder": "We built, broke, and rebuilt a side project around {topic}.",
-}
+class SampleProposal(BaseModel):
+    """One sample proposal, and what the review process should do with it.
 
-_BODIES = {
-    "talk": [
-        "This talk walks through what worked, what failed, and the one change that made the "
-        "biggest difference. You will leave with a short checklist you can try at home.",
-        "I will share the tools, the numbers before and after, and the mistakes that cost me "
-        "the most time, so you can skip them.",
-        "Expect a live demo, a few honest failures, and a clear path for getting started "
-        "this weekend.",
-    ],
-    "lightning": [
-        "In five minutes I will show the setup, one surprising result, and the single tip I "
-        "wish someone had told me on day one.",
-        "Five minutes, one demo, and a question for the audience to vote on.",
-        "A quick before-and-after, plus the one thing I would do differently.",
-    ],
-}
+    ``case`` and ``expect`` are for the presenter only. They are never saved, so the
+    reviewers judge the proposal on its title and abstract alone.
+    """
+
+    case: str
+    expect: str
+    contact_email: str
+    persona: str
+    track: str
+    title: str
+    abstract: str
+
+    @property
+    def accurate(self) -> bool:
+        return self.case == ACCURATE
 
 
-@dataclass(frozen=True)
-class SamplePlan:
-    """One proposal to create: who, in which voice, on what, in which track."""
-
-    name: str
-    persona: Persona
-    topic: str
-    track: Track
+def load_samples(content_dir: Path) -> list[SampleProposal]:
+    raw = yaml.safe_load((content_dir / SAMPLE_FILE).read_text(encoding="utf-8"))
+    samples = [SampleProposal.model_validate(item) for item in raw]
+    if len(samples) > MAX_SAMPLES:
+        raise ValueError(f"{SAMPLE_FILE} has {len(samples)} proposals; keep it to {MAX_SAMPLES}.")
+    return samples
 
 
-def plan_samples(catalog: Catalog, count: int, seed: int | None = None) -> list[SamplePlan]:
-    """Pick ``count`` varied proposals: distinct names, mixed personas, tracks, and topics."""
-    rng = random.Random(seed)
-    names = rng.sample(SAMPLE_NAMES, k=min(count, len(SAMPLE_NAMES)))
-    while len(names) < count:  # more proposals than names: some speakers submit twice
-        names.append(rng.choice(SAMPLE_NAMES))
-    topics = _spread(rng, catalog.topics, count)
-    tracks = _spread(rng, catalog.tracks, count)
-    return [
-        SamplePlan(name=name, persona=rng.choice(catalog.personas), topic=topic, track=track)
-        for name, topic, track in zip(names, topics, tracks, strict=True)
-    ]
+@lru_cache
+def get_samples() -> list[SampleProposal]:
+    return load_samples(get_settings().content_dir)
 
 
-def _spread[T](rng: random.Random, items: list[T], count: int) -> list[T]:
-    """``count`` picks that use every item before repeating any."""
-    picks: list[T] = []
-    while len(picks) < count:
-        batch = list(items)
-        rng.shuffle(batch)
-        picks.extend(batch)
-    return picks[:count]
-
-
-def write_offline(plan: SamplePlan, rng: random.Random) -> tuple[str, str]:
-    """A title and abstract from the templates, with no model call."""
-    topic = plan.topic
-    title = rng.choice(_TITLES.get(plan.track.id, _TITLES["fun"])).format(Topic=topic.title())
-    opener = _OPENERS.get(plan.persona.id, "I have been exploring {topic} for a while.")
-    abstract = f"{opener.format(topic=topic)} {rng.choice(_BODIES[plan.track.format])}"
-    return title, abstract
+def pick_samples(samples: list[SampleProposal], count: int) -> list[SampleProposal]:
+    """The first ``count`` samples: the accurate ones come first in the file."""
+    return samples[:count]
 
 
 def create_offline(
-    store: Store, catalog: Catalog, count: int, seed: int | None = None
+    store: Store, catalog: Catalog, samples: list[SampleProposal]
 ) -> list[dict[str, Any]]:
-    """Create ``count`` submitted proposals from templates. Free; no API calls."""
-    rng = random.Random(seed)
+    """Save the samples as written, status "submitted". Free; no API calls, no moderation."""
     created = []
-    for plan in plan_samples(catalog, count, seed):
-        title, abstract = write_offline(plan, rng)
-        member = store.find_or_add_member(plan.name, persona=plan.persona.id)
+    for sample in samples:
+        track = catalog.track(sample.track)
+        member = store.find_or_add_member(
+            sample.contact_email, persona=catalog.persona(sample.persona).id
+        )
         created.append(
             store.add_proposal(
                 member_id=member["id"],
                 event_id=catalog.event.id,
-                track=plan.track.id,
-                format=plan.track.format,
-                title=title,
-                abstract=abstract,
+                track=track.id,
+                format=track.format,
+                title=sample.title,
+                abstract=sample.abstract,
                 source="sample",
             )
         )
