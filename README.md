@@ -248,6 +248,22 @@ uv run pytest
 described in its guide, and that every file a guide points to exists. If you add a step,
 add it in both places.
 
+### Publishing your copy
+
+`setup host` and `setup deployment` write your tunnel host and vault ID into the files
+under `managed/` and `phase2/b-self-hosted-service/`. Before you commit those files to a
+public repo, put the sample values back, commit, then restore your own:
+
+```sh
+uv run concierge setup public --check   # list the files that hold your values (exit 1 if any)
+uv run concierge setup public           # sample host and `vault_ids: []` back in
+git add managed phase2 && git commit
+uv run concierge setup host && uv run concierge setup deployment   # your values back
+```
+
+Do not run `ant apply` while the sample values are in: it would point your agents at
+`concierge.example.com`. `claude-lock.json` and `.env` are git-ignored and never touched.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

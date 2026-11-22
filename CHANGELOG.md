@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### 2026-11-21
 
 #### Added
+- `concierge setup public` puts the sample values back in the resource files so they are
+  safe to commit to a public repo: your tunnel host becomes `concierge.example.com` again
+  and the deployment's `vault_ids` becomes `[]`, in `managed/` and
+  `phase2/b-self-hosted-service/`. `--check` only lists the files that still hold your
+  values and exits 1 if any do. `setup host` and `setup deployment` restore your values
+  afterwards. The logic lives in `src/concierge/publish.py`; README "Publishing your copy"
+  has the steps.
+
 - Event DB `check_agenda_fit` tool (`src/concierge/agenda.py`): counts every accepted
   proposal against the evening's talk time after breaks (one per full hour after the first)
   and the end buffer, and says which extra proposals fit, taken in the order given. The

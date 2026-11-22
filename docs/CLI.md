@@ -108,6 +108,18 @@ uv run concierge setup host [HOSTNAME]
 | --- | --- | --- |
 | `HOSTNAME (optional)` | none | Defaults to the host in CONCIERGE_PUBLIC_BASE_URL (.env). |
 
+## `concierge setup public`
+
+Put the sample host and an empty vault list back, so the files are safe to publish.
+
+```sh
+uv run concierge setup public [OPTIONS]
+```
+
+| Argument or option | Default | What it does |
+| --- | --- | --- |
+| `--check` | off | Only list the files that hold your values; change nothing. |
+
 ## `concierge setup all`
 
 Run the whole phase 1 setup in order; safe to re-run, stops at the first failure.

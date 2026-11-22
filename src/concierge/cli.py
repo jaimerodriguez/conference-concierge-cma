@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import random
 import re
+from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlsplit
 
@@ -17,6 +18,12 @@ from concierge import wiring
 from concierge.config import PLACEHOLDER_HOST, REPO_ROOT, get_settings
 from concierge.managed import ManagedResources, NotAppliedError, PlaceholderHostError
 from concierge.progress import Progress, first_sentence
+from concierge.publish import (
+    find_private_values,
+    private_hosts,
+    resource_files,
+    restore_placeholders,
+)
 from concierge.services.store import PROPOSAL_STATUSES
 from concierge.sessions import Decision, SessionResult, console_url
 from concierge.state import load_state, update_state
@@ -262,11 +269,7 @@ def setup_host(
             )
     previous = load_state(settings.state_path).get("managed_host", PLACEHOLDER_HOST)
     changed = 0
-    # The phase 2b files are generated from managed/, so keep them pointing at the same host.
-    roots = [settings.managed_dir, REPO_ROOT / "phase2" / "b-self-hosted-service"]
-    for path in sorted(file for root in roots for file in root.rglob("*")):
-        if path.suffix not in {".md", ".yaml"} or not path.is_file():
-            continue
+    for path in resource_files(_resource_roots(settings)):
         text = path.read_text(encoding="utf-8")
         if previous in text:
             path.write_text(text.replace(previous, hostname), encoding="utf-8")
@@ -278,6 +281,58 @@ def setup_host(
         "Next, for the phase 1 steps, run [bold]ant apply from inside the managed/ folder[/bold] "
         "(`cd managed && ant apply`). Not from the repo root: that would also apply the "
         "phase 2 files under phase2/. See Guide 01."
+    )
+
+
+def _resource_roots(settings: Any) -> list[Path]:
+    # The phase 2b files are generated from managed/, so they carry the same host.
+    return [settings.managed_dir, REPO_ROOT / "phase2" / "b-self-hosted-service"]
+
+
+@setup_app.command("public")
+def setup_public(
+    check: Annotated[
+        bool,
+        typer.Option("--check", help="Only list the files that hold your values; change nothing."),
+    ] = False,
+) -> None:
+    """Put the sample host and an empty vault list back, so the files are safe to publish.
+
+    Undoes `setup host` and `setup deployment` in managed/ and phase2/b-self-hosted-service/:
+    your tunnel host goes back to concierge.example.com and the deployment's vault_ids back
+    to []. Commit, then run `setup host` and `setup deployment` to get your values back.
+    Do not run `ant apply` in between. With --check it changes nothing and exits 1 if any
+    of your values are still in the files.
+    """
+    settings = get_settings()
+    roots = _resource_roots(settings)
+    hosts = private_hosts(load_state(settings.state_path).get("managed_host"), settings.public_host)
+    findings = find_private_values(roots, hosts)
+    if not findings:
+        console.print("[green]No private host or vault ID in the resource files.[/green]")
+        return
+    if check:
+        table = Table("File", "Private value")
+        for finding in findings:
+            table.add_row(str(finding.path.relative_to(REPO_ROOT)), finding.value)
+        console.print(table)
+        console.print("Run `uv run concierge setup public` to put the placeholders back.")
+        raise typer.Exit(1)
+    for path in restore_placeholders(roots, hosts):
+        console.print(f"  restored {path.relative_to(REPO_ROOT)}")
+    # `setup host` replaces whatever host it last wrote, which is now the placeholder again.
+    update_state(settings.state_path, managed_host=PLACEHOLDER_HOST)
+    if left := find_private_values(roots, hosts):
+        for finding in left:
+            console.print(
+                f"[red]still there[/red]  {finding.value} in "
+                f"{finding.path.relative_to(REPO_ROOT)} (edit it by hand)"
+            )
+        raise typer.Exit(1)
+    console.print(
+        "[green]The files are ready to commit.[/green] Afterwards, get your own values back "
+        "with `uv run concierge setup host` and `uv run concierge setup deployment`. "
+        "Do not run `ant apply` until you have."
     )
 
 
