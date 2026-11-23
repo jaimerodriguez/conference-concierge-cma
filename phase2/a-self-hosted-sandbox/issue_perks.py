@@ -11,12 +11,31 @@ the result goes back.
 
 from __future__ import annotations
 
+from typing import Any
+
+from rich.console import Console
+from rich.markdown import Markdown
+
 from concierge.clients import get_client
 from concierge.config import get_settings
 from concierge.managed import ManagedResources
 from concierge.perks import run_custom_tool
+from concierge.progress import Progress
 from concierge.sessions import budget, console_url, follow_session, user_message
 from concierge.telemetry import setup_telemetry, shutdown_telemetry
+
+AGENT = "Speaker Liaison"
+console = Console()
+
+
+def run_and_show(name: str, tool_input: dict[str, Any]) -> str:
+    """Run the custom tool here, and say so: not in the worker container, not at Anthropic."""
+    member = tool_input.get("member_id", "a speaker")
+    console.print(
+        f"[dim]\\[{AGENT}][/dim] issuing a perk code for {member} "
+        "[dim](runs in this script, not the worker)[/dim]"
+    )
+    return run_custom_tool(name, tool_input)
 
 
 def main() -> None:
@@ -35,10 +54,13 @@ def main() -> None:
         client,
         session.id,
         send=[user_message("Issue perk codes for every accepted speaker.")],
-        custom_tools=run_custom_tool,
-        on_text=print,
+        custom_tools=run_and_show,
+        on_text=lambda text: console.print(Markdown(text)),
+        on_event=Progress(console, lead=AGENT),
     )
-    print(f"\nSession: {console_url(result.session_id)} ({result.stop_reason})")
+    console.print(f"\n[dim]Session:[/dim] {console_url(result.session_id)}")
+    if not result.ok:
+        console.print(f"[yellow]Stopped: {result.stop_reason}[/yellow]")
     shutdown_telemetry()
 
 

@@ -2,6 +2,7 @@
 #   export ANTHROPIC_ENVIRONMENT_ID=env_...       (from `concierge setup show`)
 #   export ANTHROPIC_ENVIRONMENT_KEY=sk-ant-oat01-...   (Console: the environment's page)
 #   docker compose up --build
+# Or put both in a git-ignored .env next to this file (see .env.example).
 services:
   worker:
     build: .

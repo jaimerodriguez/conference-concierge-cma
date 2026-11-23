@@ -5,6 +5,40 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2026-11-23
+
+#### Added
+- `phase2/a-self-hosted-sandbox/.env.example` lists the worker's two variables,
+  `ANTHROPIC_ENVIRONMENT_ID` and `ANTHROPIC_ENVIRONMENT_KEY`. Copy it to `.env` in that
+  folder (git-ignored) as an alternative to shell exports. Guide 20 "Try it" and the
+  top-level `.env.example` now say that the worker does not read the top-level `.env`.
+
+#### Changed
+- `concierge setup vault` with `CONCIERGE_ENVIRONMENT=self-hosted` now deletes the
+  CloudCredits `environment_variable` credential instead of only skipping it. Sessions in
+  a self-hosted environment are refused while their vault holds one, so `issue_perks.py`
+  failed with a 400. Running `setup vault` in cloud mode puts the key back from `.env`.
+  Guide 20 "Try it" now runs `setup vault` first.
+- The phase 2a worker logs at INFO (`LOG_LEVEL` overrides it), so `docker compose up`
+  shows each claimed session instead of printing nothing. It wraps the SDK's built-in
+  tools to log what each call ran on (`tool ran in this container: read /mnt/memory/...`)
+  in place of the SDK's bare `executing tool tool=read tool_use_id=...` line.
+  The SDK's "tool 'issue_perk_code' not owned by this runner" line, which reads like a
+  warning, now says "custom tool issue_perk_code runs in your client, not here".
+- With `CONCIERGE_ENVIRONMENT=self-hosted`, every agent command ends by saying that
+  built-in tools ran in your worker container. `issue_perks.py` now prints progress like
+  the other commands (`[Speaker Liaison] reading the accepted proposals`), marks each
+  `issue_perk_code` call as run by the script, not the worker, and renders the agent's
+  reply as Markdown. Guide 20 has a "What to look for" section with sample
+  output from both terminals.
+
+#### Fixed
+- The phase 2a sandbox worker exited at start with `can't open file
+  '/opt/concierge/worker.py': [Errno 13] Permission denied` when the checkout's files were
+  private (mode 0600). The Dockerfile now copies `worker.py` with `--chmod=0644` and
+  creates `/opt/concierge` beforehand, so the non-root `sandbox` user can read it whatever
+  the file mode in your checkout.
+
 ### 2026-11-21
 
 #### Added
