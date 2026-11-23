@@ -162,6 +162,26 @@ def store_calendar_static_token(client: Anthropic, vault_id: str, settings: Sett
     )
 
 
+def remove_cloudcredits_key(client: Anthropic, vault_id: str) -> str:
+    """Guide 20 · Moving tools into your own sandbox · Step 3: take the egress secret out
+
+    A session in a self-hosted environment is refused if its vault holds any
+    ``environment_variable`` credential, so the key stored for phase 1 has to go. The value
+    stays in your .env: run ``setup vault`` with ``CONCIERGE_ENVIRONMENT=cloud`` to put it back.
+    """
+    removed = 0
+    for credential in client.beta.vaults.credentials.list(vault_id):
+        if getattr(credential.auth, "type", None) == "environment_variable":
+            client.beta.vaults.credentials.delete(credential.id, vault_id=vault_id)
+            removed += 1
+    if removed:
+        return (
+            "removed CloudCredits key: self-hosted sessions refuse a vault with "
+            "environment_variable credentials (setup vault in cloud mode puts it back)"
+        )
+    return "skipped CloudCredits key: not available outside the cloud sandbox"
+
+
 def has_credential_for(client: Anthropic, url: str, settings: Settings | None = None) -> bool:
     """True when the vault already holds a credential for this MCP server URL."""
     from concierge.wiring import normalize_url
@@ -203,7 +223,7 @@ def store_static_secrets(client: Anthropic, settings: Settings | None = None) ->
         results.append(store_cloudcredits_key(client, vault_id, settings))
     else:
         # Environment-variable credentials need Anthropic-managed egress (Guides 20 and 21).
-        results.append("skipped CloudCredits key: not available outside the cloud sandbox")
+        results.append(remove_cloudcredits_key(client, vault_id))
     if settings.calendar_static_token:
         results.append(store_calendar_static_token(client, vault_id, settings))
     return results

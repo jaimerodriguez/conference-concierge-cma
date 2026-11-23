@@ -65,6 +65,13 @@ def _client() -> Any:
 def _finish(result: SessionResult) -> None:
     """Print how a session ended and flush traces."""
     console.print(f"\n[dim]Session:[/dim] {console_url(result.session_id)}")
+    settings = get_settings()
+    if settings.environment == "self-hosted" and not settings.environment_id:
+        # Guide 20: nothing in the session's events says where a tool ran, so point there.
+        console.print(
+            "[dim]Environment:[/dim] self-hosted. Built-in tools (read, grep, bash...) ran in "
+            "your worker container: its terminal shows each one."
+        )
     if result.outcome_result:
         console.print(f"[dim]Outcome:[/dim] {result.outcome_result}")
     for run_id, ending in result.workflow_runs.items():

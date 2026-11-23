@@ -608,3 +608,27 @@ def test_agenda_fit_reports_an_existing_overrun() -> None:
     result = check_fit(event, accepted, [])
 
     assert result["already_overrun"] and result["minutes_left_after_fits"] == -5
+
+
+def test_setup_vault_removes_the_egress_secret_for_a_self_hosted_environment() -> None:
+    from types import SimpleNamespace as NS
+
+    from concierge import vaults
+
+    secret = _secret_credential(["coco.example.com"])
+    bearer = NS(id="vcrd_2", auth=NS(type="static_bearer", mcp_server_url="https://x/mcp"))
+    deleted: list[str] = []
+    client = NS(
+        beta=NS(
+            vaults=NS(
+                credentials=NS(
+                    list=lambda _v: [secret, bearer],
+                    delete=lambda cred_id, vault_id: deleted.append(cred_id),
+                )
+            )
+        )
+    )
+    assert vaults.remove_cloudcredits_key(client, "vlt_1").startswith("removed")
+    assert deleted == [secret.id]
+    client.beta.vaults.credentials.list = lambda _v: [bearer]
+    assert vaults.remove_cloudcredits_key(client, "vlt_1").startswith("skipped")

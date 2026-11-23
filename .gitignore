@@ -231,3 +231,9 @@ phase2/**/claude-lock.json
 
 # Personal Claude Code settings (permissions), never committed
 .claude/settings.local.json
+
+# Phase 2b settings for your own server (holds the server API key)
+.env.selfhosted
+
+# Local-only notes, not published
+docs/TROUBLESHOOTING.md
