@@ -40,6 +40,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   private (mode 0600). The Dockerfile now copies `worker.py` with `--chmod=0644` and
   creates `/opt/concierge` beforehand, so the non-root `sandbox` user can read it whatever
   the file mode in your checkout.
+- `.env.selfhosted` (phase 2b, holds your server's API key) is now git-ignored, like `.env`.
+- Docs pass before the repo goes public:
+  - Guide 05 said to restart `concierge services`; the command is `concierge serve`. Its
+    "Try it" comment said the command proposes a session; it proposes a talk.
+  - `docs/SPEC.md`: code markers are `Guide NN · <title> · Step N`, not `Step N of <guide>`;
+    the Abstract Writer's outcome is graded against `content/rubrics/abstract.md`, not the
+    track rubrics; the portal is Starlette, not FastAPI; session budgets list the real caps
+    ($0.50 abstract, $0.25 Attendee Helper, $5 agenda and daily review); the Program Chair
+    also records the organizer's acceptances in the Event DB; the Console viewer row no longer
+    points to an `ant beta:sessions connect` tip that no guide has.
+  - Small punctuation and trailing-space fixes in Guides 04, 05 and 11.
 
 ### 2026-11-21
 

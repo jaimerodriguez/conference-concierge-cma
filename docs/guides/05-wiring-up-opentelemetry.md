@@ -53,7 +53,7 @@ CONCIERGE_OTEL_CONTENT_MODE=content
 ```
 The demo reads it in `src/concierge/config.py` (`otel_content_mode`) and passes it to the SDK
 in `src/concierge/clients.py` through `sdk_telemetry_option` (Step 3). It is read when a
-process starts, so restart `concierge services` after changing it.
+process starts, so restart `concierge serve` after changing it.
 
 **Before you switch to `content`:** prompts include what audience members typed (titles and
 abstracts). Your backend then keeps that text under its own access and retention
@@ -119,8 +119,8 @@ Reference: [OpenTelemetry for the Claude API](https://platform.claude.com/docs/e
 # From the root of the repository, where docker-compose.yml is
 docker compose up -d                              # starts Jaeger
 # In .env, uncomment: OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-# The line below proposes a new session titled "Running models locally"  
-uv run concierge propose "Running models locally"  
+# The line below proposes a talk titled "Running models locally"
+uv run concierge propose "Running models locally"
 open http://localhost:16686                       # pick service concierge-cli, then Find Traces
 ```
 Open the `concierge.submit_proposal` trace. You see your own span with moderation and the

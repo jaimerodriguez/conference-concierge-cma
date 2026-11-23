@@ -15,7 +15,7 @@ the daily review digest.
 
 ## Steps
 
-**Step 0. Start with a standard agent.**  Check `managed/agents/abstract-writer/agent.md`    
+**Step 0. Start with a standard agent.** Check `managed/agents/abstract-writer/agent.md`.
 
 **Step 1. Start the session with an outcome instead of a message.** The
 `user.define_outcome` event carries the description, the rubric, and `max_iterations`.

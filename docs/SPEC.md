@@ -16,7 +16,7 @@ the 2a/2b split, and the event name on 2026-11-19.
 2. Ship as readable Python source that attendees can clone and run against their own Claude
    API workspace.
 3. Teach through **task guides**: short how-tos that point into the source. Code carries
-   `Step N of <guide>` comments, so a reader can jump from a guide to the code and back.
+   `Guide NN · <title> · Step N` comments, so a reader can jump from a guide to the code and back.
 4. Phase 2 shows what changes, and what you deliberately give up, when you self-host the
    sandbox and then the whole service.
 
@@ -88,8 +88,9 @@ A rubric is a **shared base plus a per-track add-on**, both markdown files in
 Adding a track means adding one markdown file. Rubrics are used twice:
 
 1. **Proposal scoring.** The CFP Reviewer reads base + track rubrics and scores each criterion.
-2. **Abstract quality (Outcomes).** The Abstract Writer's session is graded against the track
-   template, so a generated abstract iterates until it meets the format (§5.3).
+2. **Abstract quality (Outcomes).** The Abstract Writer's session is graded against its own
+   rubric, `content/rubrics/abstract.md`, so a generated abstract iterates until it meets the
+   format (§5.3).
 
 ### 3.4 Venues
 
@@ -113,7 +114,7 @@ person's title is what the agent writes about.
 ```
                  ┌───────────────────────────── Anthropic (Managed Agents) ─────────────────────────────┐
  Phone ──► Portal│  Abstract Writer (on-the-fly)     Program Chair ──advisor──► Opus                     │
- (FastAPI)  │    │                                   │  roster: CFP Reviewer, Scheduler, Speaker Liaison │
+ (Starlette)│    │                                   │  roster: CFP Reviewer, Scheduler, Speaker Liaison │
             │    │  Attendee Helper                  │  workflow runs: CFP Reviewer × N                 │
  Moderator  │    │                                   │                                                  │
  (Messages  │    │  Memory stores: venues (ro), rubrics (ro), ops-notes (rw)                            │
@@ -143,7 +144,7 @@ where noted.
 
 | Agent | Model | Declared | Role | Tools |
 |---|---|---|---|---|
-| **Program Chair** | Sonnet 5.5, advisor Opus 5.5 | ant | Coordinator. Runs the daily review, builds the agenda, delegates | agent toolset; Event DB MCP (read); multiagent roster + workflows + advisor |
+| **Program Chair** | Sonnet 5.5, advisor Opus 5.5 | ant | Coordinator. Runs the daily review, builds the agenda, delegates | agent toolset; Event DB MCP (reads proposals, records the organizer's acceptances); multiagent roster + workflows + advisor |
 | **CFP Reviewer** | Sonnet 5.5 | ant | Scores one or more proposals against base + track rubric | Event DB MCP (read proposals, write scores); rubrics memory |
 | **Scheduler** | Sonnet 5.5 | ant | Plans slots, books calendar events as the organizer | Calendar MCP (OAuth, `always_ask` on create); Event DB MCP |
 | **Speaker Liaison** | Haiku 5.5 | ant | Issues CloudCredits perk codes, drafts welcome notes | bash (curl with vault env var); Event DB MCP |
@@ -196,11 +197,11 @@ read-only), which also blocks memory poisoning from the public.
 
 | Feature | Where | Why include |
 |---|---|---|
-| **Outcomes** | Abstract Writer (graded against the track template); daily digest (graded against a digest rubric) | Rubric-graded iteration fits the scenario |
+| **Outcomes** | Abstract Writer (graded against `content/rubrics/abstract.md`); daily digest (graded against a digest rubric) | Rubric-graded iteration fits the scenario |
 | **Permission policies** | Calendar event creation and the Speaker Liaison's perk-code calls (`bash`) are `always_ask`; organizer approves in the CLI | Human-in-the-loop |
-| **Session budgets** | Every session the portal creates gets a $0.50 cap; daily review $5 | Safe for a public demo taking audience input |
+| **Session budgets** | Each abstract session gets a $0.50 cap, the Attendee Helper $0.25, the agenda run and the daily review $5 | Safe for a public demo taking audience input |
 | **Agent versioning** | Edit a prompt, `ant apply`, show the new version and pinned sessions | Shows the create-once, version-in-place model |
-| Console session viewer, `ant beta:sessions connect` | Debugging tips in guides | Zero-setup observability |
+| Console session viewer | Every session command prints a Console link (Guides 05, 08, 09) | Zero-setup observability |
 
 ### 5.2 Safety for audience input
 
@@ -219,7 +220,7 @@ read-only), which also blocks memory poisoning from the public.
 **Propose a talk (on-the-fly agent + outcome).**
 Portal → moderation of the title → `sessions.create` with `agent_with_overrides` (system prompt
 built from persona + track, `budget`) and `initial_events: [user.define_outcome]` whose rubric is
-base + track template → stream until idle → read `abstract.json` from the session → save the
+`content/rubrics/abstract.md` → stream until idle → read `abstract.json` from the session → save the
 proposal through the services API. When the person writes their own abstract, the portal
 moderates the title and abstract and saves them as they are (source `manual_abstract`); no
 session runs.
