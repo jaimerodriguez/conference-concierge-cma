@@ -31,6 +31,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `issue_perk_code` call as run by the script, not the worker, and renders the agent's
   reply as Markdown. Guide 20 has a "What to look for" section with sample
   output from both terminals.
+- Guide 21 says why phase 2b is not a live demo: self-hosted Managed Agents is gated, and
+  access comes through your Anthropic account team.
 
 #### Fixed
 - The phase 2a sandbox worker exited at start with `can't open file

@@ -3,9 +3,11 @@
 **You'll learn:** what changes when you run the Managed Agents service itself: the API, the
 agent loop, and storage in your own PostgreSQL. This is phase 2b.
 
-**This part is source and instructions, not a live demo.** The server release comes
-through your Anthropic account team. The differences from phase 1 are deliberate: this
-guide is a map of what you keep and what you give up.
+**This part is source and instructions, not a live demo, because the feature is gated.**
+To get access to self-hosted Managed Agents, contact your Anthropic account team.
+
+The differences from phase 1 are deliberate: this guide is a map of what you keep and
+what you give up.
 Reference: <https://platform.claude.com/docs/en/managed-agents/self-hosted>
 
 **The story:** the company now wants agent definitions and session history stored in its
