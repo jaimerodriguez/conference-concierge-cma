@@ -380,7 +380,7 @@ names the file and the `Step N` marker to search for. In code, markers look like
 
 ---
 
-## 9. Demo script (about 20 minutes)
+## 9. Demo script (about 15 minutes)
 
 1. The setup: show `managed/`, run `ant apply --dry-run`, then apply. (Guide 01)
 2. Audience submits talks from phones; each typed title gets moderated. (03, 11, 13)

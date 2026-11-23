@@ -51,6 +51,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     also records the organizer's acceptances in the Event DB; the Console viewer row no longer
     points to an `ant beta:sessions connect` tip that no guide has.
   - Small punctuation and trailing-space fixes in Guides 04, 05 and 11.
+  - `docs/SPEC.md` section 9: the demo script is about 15 minutes, matching the README.
+
+#### Removed
+- `docs/TROUBLESHOOTING.md` is no longer tracked (kept locally and git-ignored), and the
+  README no longer links to it. `concierge doctor` stays the first stop.
 
 ### 2026-11-21
 

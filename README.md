@@ -207,8 +207,8 @@ Every command and option is listed in [`docs/CLI.md`](docs/CLI.md) (generated fr
 ask the program: `uv run concierge --help`, `uv run concierge setup --help`,
 `uv run concierge setup vault --help`.
 
-Something went wrong? Start with `uv run concierge doctor`, then see
-[`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md), which lists each symptom, its cause and the fix.
+Something went wrong? Start with `uv run concierge doctor`: it lists what is missing,
+which address or credential disagrees, and what to run.
 
 ## Good to know before you run it
 
