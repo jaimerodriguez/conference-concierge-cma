@@ -1,14 +1,14 @@
 # Conference Concierge
+A small demo of **Claude Managed Agents** (CMA).
 
-A small, friendly demo of **Claude Managed Agents**. 
-I created it for a 15-minute presentation at a Claude user group in San Diego. 
-
+## The use case/scenario
 Conference Concierge consists of a team of agents that helps run a
 user-group meetup. Members propose talks from their phones, agents review them every
 morning, an organizer approves the agenda, speakers get a sponsor perk, and attendees ask
 about the venue.
 
-This source is built to be read. Major features have a short [task guide](docs/guides/README.md) that
+## The purpose
+I created it for a 15-minute presentation at a Claude user group in San Diego. It is meant to be a self-paced learning tool. Each highlighted feature has a short [task guide](docs/guides/README.md) that
 points to the exact lines that implement it, and the source carries matching markers, like this one: 
 
 ```python
