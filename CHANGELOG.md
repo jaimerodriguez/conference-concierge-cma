@@ -5,6 +5,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2026-11-24
+
+#### Changed
+- The GitHub repository is now `jaimerodriguez/conference-concierge-cma`. The README's issue
+  and pull request links, the repository name in `docs/SPEC.md` (layout and decisions), and
+  the example path in `phase2/b-self-hosted-service/cron/daily-review.cron` use the new name.
+  `pyproject.toml` lists the repository and issues URLs. The Python package keeps its name,
+  `conference-concierge`.
+- README: a "Get the code" step (`git clone` and `cd conference-concierge-cma`) before setup,
+  and a link to the companion write-up on jaimerodriguez.com.
+- Docs scrub before going public: `docs/SPEC.md` no longer says the Speaker Liaison drafts
+  welcome notes (it issues and records perk codes); Guide 21 says to copy
+  `env.selfhosted.example` to `.env.selfhosted`; Guide 11 drops a repeated bullet; small
+  wording and whitespace fixes in the README and Guide 04.
+- `tests/test_publish.py` uses a made-up vault ID instead of a real one.
+
 ### 2026-11-23
 
 #### Added

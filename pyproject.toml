@@ -26,6 +26,10 @@ dependencies = [
     "uvicorn>=0.30",
 ]
 
+[project.urls]
+Repository = "https://github.com/jaimerodriguez/conference-concierge-cma"
+Issues = "https://github.com/jaimerodriguez/conference-concierge-cma/issues"
+
 [project.scripts]
 concierge = "concierge.cli:entry_point"
 

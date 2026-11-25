@@ -5,4 +5,4 @@
 # Install with `crontab -e`. Adjust the paths. Cron has a minimal environment, so the command
 # loads the variables it needs from a file that only your user can read (chmod 600).
 CRON_TZ=America/Los_Angeles
-0 8 * * * cd /path/to/conference-concierge && set -a && . ./.env.selfhosted && set +a && .venv/bin/concierge review run --direct >> .concierge/daily-review.log 2>&1
+0 8 * * * cd /path/to/conference-concierge-cma && set -a && . ./.env.selfhosted && set +a && .venv/bin/concierge review run --direct >> .concierge/daily-review.log 2>&1

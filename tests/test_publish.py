@@ -13,7 +13,7 @@ from concierge.config import PLACEHOLDER_HOST, Settings
 from concierge.publish import find_private_values, private_hosts, restore_placeholders
 
 HOST = "coco.mine.test"
-VAULT = "vlt_011ChC2LxHZj2GNyyrcoQGZM"
+VAULT = "vlt_011TestVault0000000000AB"
 
 
 def _tree(root: Path) -> Path:
