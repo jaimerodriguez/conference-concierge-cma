@@ -47,8 +47,8 @@ uv run concierge review run --direct     # prints "Grader, round 1 of 3: ..." li
   **start state** (which proposals were submitted) on the first line of the digest, and the rubric
   judges against that. Without it the grader guesses from timestamps and can contradict itself
   between rounds.
-- The grader is separate from the agent and sees only the rubric and the work, which is
-  what makes its verdict worth reading.
+- The grader is separate from the agent, with its own context, which is what makes its
+  verdict worth reading.
 - `max_iterations` and the session budget together bound the cost of "until it's right".
 - The rubrics here are starters. Tune them against a few real runs before you rely on them.
 - Output files appear a moment after the session goes idle, so `read_output_file` retries

@@ -45,7 +45,8 @@ Find it: `phase2/b-self-hosted-service/make_managed.py`, marker `Guide 21 · ...
 The result is committed in `phase2/b-self-hosted-service/managed/`.
 
 **Step 2. Point the SDK and the `ant` CLI at your server.** Two variables: the base URL
-and the *server's* API key. No code changes.
+and the *server's* API key. No code changes. Copy the example to `.env.selfhosted` in the
+repository root (git-ignored), make it readable only by you (`chmod 600`), and fill it in.
 Find it: `phase2/b-self-hosted-service/env.selfhosted.example`, marker `Step 2`.
 
 **Step 3. Apply the generated files and use the server's environment.** Nothing copies

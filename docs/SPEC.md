@@ -147,7 +147,7 @@ where noted.
 | **Program Chair** | Sonnet 5.5, advisor Opus 5.5 | ant | Coordinator. Runs the daily review, builds the agenda, delegates | agent toolset; Event DB MCP (reads proposals, records the organizer's acceptances); multiagent roster + workflows + advisor |
 | **CFP Reviewer** | Sonnet 5.5 | ant | Scores one or more proposals against base + track rubric | Event DB MCP (read proposals, write scores); rubrics memory |
 | **Scheduler** | Sonnet 5.5 | ant | Plans slots, books calendar events as the organizer | Calendar MCP (OAuth, `always_ask` on create); Event DB MCP |
-| **Speaker Liaison** | Haiku 5.5 | ant | Issues CloudCredits perk codes, drafts welcome notes | bash (curl with vault env var); Event DB MCP |
+| **Speaker Liaison** | Haiku 5.5 | ant | Issues CloudCredits perk codes and records them | bash (curl with vault env var); Event DB MCP |
 | **Attendee Helper** | Haiku 5.5 | ant | Answers attendee questions | venues memory (read-only), ops-notes (read-only) |
 | **Abstract Writer** | Haiku 5.5 base | ant (base) + **on-the-fly overrides** per request | Writes an abstract for the person's title, persona, and track | agent toolset (write only) |
 | **Speaker Bio Writer** | Haiku 5.5 | **created at runtime** with `agents.create` (guarded, created once) | Writes a short bio for an accepted speaker | none beyond write |
@@ -313,7 +313,7 @@ operator guide shipped with the release".
 ## 7. Repository layout
 
 ```
-conference-concierge/
+conference-concierge-cma/
 ├── pyproject.toml            # hatchling, Ruff, pytest settings
 ├── README.md                 # quickstart and demo script
 ├── docker-compose.yml        # Jaeger (accepts OTLP directly)
@@ -399,7 +399,7 @@ names the file and the `Step N` marker to search for. In code, markers look like
 2. The additional features (§5.1) are in, each with a task guide: agent versioning (Guide 02),
    outcomes (Guide 11), permission policies and session budgets (Guide 12).
 3. Phase 2 is split into 2a (self-hosted sandbox) and 2b (self-hosted service).
-4. The repository is the `conference-concierge` GitHub repo.
+4. The repository is the [`conference-concierge-cma`](https://github.com/jaimerodriguez/conference-concierge-cma) GitHub repo.
 5. The sample event is called "AI Meetup".
 
 ## 11. Sources

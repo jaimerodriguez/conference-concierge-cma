@@ -43,4 +43,5 @@ compare. Add a venue by adding one markdown file and seeding again.
   runs leave notes there. `uv run concierge data clear` resets it to `content/ops-notes`: it
   lists the run-written notes by name, deletes them after you confirm, and restores the seed
   files. `--local-only` leaves it alone.
-- You can navigate and list the memory store using the ant CLI: `ant beta:memory-stores list`. Use the arrows to expand and navigate the store details.  
+- You can navigate and list the memory store using the `ant` CLI: `ant beta:memory-stores list`. Use the arrow keys to expand and
+  navigate the store details.

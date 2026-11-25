@@ -9,7 +9,7 @@ about the venue.
 
 ## The purpose
 I created it for a 15-minute presentation at a Claude user group in San Diego. It is meant to be a self-paced learning tool. Each highlighted feature has a short [task guide](docs/guides/README.md) that
-points to the exact lines that implement it, and the source carries matching markers, like this one: 
+points to the exact lines that implement it, and the source carries matching markers, like this one:
 
 ```python
 # Guide 05 · Wiring up OpenTelemetry · Step 2: register the tracer provider.
@@ -17,7 +17,11 @@ points to the exact lines that implement it, and the source carries matching mar
 
 Search the repo for `Guide 05 ·` to see every step of a guide in place.
 
-Disclaimer: All the code and guides are AI generated. This is a sample that introduces concepts and features; it is not production code or production prompts.  If you see issues, please [report them](https://github.com/jaimerodriguez/conference-concierge/issues) or [create a PR](https://github.com/jaimerodriguez/conference-concierge/pulls).
+The companion write-up, [Claude Managed Agents: What You Get, What You Give Up](https://jaimerodriguez.com/2026/11/23/claude-managed-agents.html),
+covers what CMA is, the case for a managed platform, and what you trade for it. This repo is
+the hands-on part.
+
+Disclaimer: All the code and guides are AI generated. This is a sample that introduces concepts and features; it is not production code or production prompts. If you see issues, please [report them](https://github.com/jaimerodriguez/conference-concierge-cma/issues) or [create a PR](https://github.com/jaimerodriguez/conference-concierge-cma/pulls).
 
 ## How a talk proposal moves through the concierge's workflows
 
@@ -96,7 +100,16 @@ On Windows, set the key for the current terminal with `$env:ANTHROPIC_API_KEY = 
 Commands below that start with `export` are for macOS and Linux; the Windows form is
 `$env:NAME = "value"`.
 
-### 2. Set up and run
+### 2. Get the code
+
+```sh
+git clone https://github.com/jaimerodriguez/conference-concierge-cma.git
+cd conference-concierge-cma
+```
+
+The commands below run from this folder, the root of the repository.
+
+### 3. Set up and run
 
 [Guide 00](docs/guides/00-setting-up.md) has the details.
 
@@ -141,7 +154,7 @@ is safe.
 Prefer to do it step by step, as the guides do? These are the same steps:
 
 ```sh
-## REMINDER: setup all (above) does all of these. We recommend using that command instead. 
+# Reminder: `setup all` (above) runs all of these; we recommend it instead.
 uv run concierge setup host                       # no argument: uses the host in .env
 cd managed && ant apply agents environments memory_stores vaults && cd ..   # from inside managed/
 uv run concierge setup memory                     # seed venues, rubrics, notes
@@ -151,12 +164,11 @@ uv run concierge setup deployment                 # put the vault's ID in the da
 cd managed && ant apply && cd ..                  # again, from inside managed/: now with the deployment
 ```
 
-After you have run the setup, confirm your configuration with the doctor command 
+After you have run the setup, confirm your configuration with the doctor command:
 
 ```sh
 uv run concierge doctor                           # what is missing, and whether every URL agrees
 ```
-
 
 The free `cloudflared` address **changes every time you restart the tunnel**. Keep terminal 2
 running while you use the demo. If the address changes: update `.env`, restart `serve`, and run
